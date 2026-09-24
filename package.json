@@ -13,7 +13,7 @@
     "inject": "node scripts/inject-server-url.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {},
   "license": "MIT",
