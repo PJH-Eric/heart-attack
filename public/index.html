@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#3CB7C8">
+  <title>海島心臟病</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- 全域設定入口：所有畫面都在右上角 -->
+    <button id="btn-settings" class="icon-btn gear-btn" type="button" aria-label="設定" aria-haspopup="dialog"></button>
+
+    <!-- ========== 首頁 ========== -->
+    <section id="screen-home" class="screen" data-screen="home">
+      <div class="home-wrap">
+        <h1 class="wood-sign title-sign"><span>海島心臟病</span></h1>
+        <div class="hero" id="hero"></div>
+        <p class="home-tag">翻牌、喊數、數字一樣就趕快拍！最慢的人收走整疊牌。</p>
+        <div class="home-actions">
+          <button class="btn3d btn-big coral" id="go-solo" type="button">一個人玩<small>跟電腦比手速</small></button>
+          <button class="btn3d btn-big sea" id="go-online" type="button">跟別人玩<small>線上房間、觀戰、邀請</small></button>
+          <button class="btn3d btn-big sand" id="go-help" type="button">怎麼玩<small>一分鐘看懂規則</small></button>
+        </div>
+        <p class="home-stats" id="home-stats"></p>
+      </div>
+    </section>
+
+    <!-- ========== 單機設定 ========== -->
+    <section id="screen-solo" class="screen" data-screen="solo" hidden>
+      <header class="topbar">
+        <button class="icon-btn back-btn" type="button" data-back="home" aria-label="回首頁"></button>
+        <h2>一個人玩</h2>
+      </header>
+      <div class="panel-card setup">
+        <label class="field">
+          <span>你的暱稱</span>
+          <input id="solo-name" maxlength="10" autocomplete="off" placeholder="不填就幫你取一個">
+        </label>
+        <div class="field">
+          <span>選一隻小動物</span>
+          <div class="char-grid" id="solo-chars" role="radiogroup" aria-label="選擇角色"></div>
+        </div>
+        <div class="field row-field">
+          <span>電腦人數</span>
+          <div class="stepper" id="solo-ai">
+            <button class="btn3d mini" type="button" data-step="-1" aria-label="少一個電腦"></button>
+            <b id="solo-ai-n">3</b>
+            <button class="btn3d mini" type="button" data-step="1" aria-label="多一個電腦"></button>
+          </div>
+        </div>
+        <div class="field">
+          <span>電腦難度</span>
+          <div class="seg" id="solo-diff" role="radiogroup" aria-label="電腦難度"></div>
+          <small class="hint" id="solo-diff-hint"></small>
+        </div>
+        <button class="btn3d btn-big coral" id="solo-start" type="button">開始遊戲</button>
+      </div>
+    </section>
+
+    <!-- ========== 怎麼玩（靜態圖文） ========== -->
+    <section id="screen-help" class="screen" data-screen="help" hidden>
+      <header class="topbar">
+        <button class="icon-btn back-btn" type="button" data-back="home" aria-label="回首頁"></button>
+        <h2>怎麼玩</h2>
+      </header>
+      <div class="panel-card help" id="help-body"></div>
+    </section>
+
+    <!-- ========== 線上大廳 ========== -->
+    <section id="screen-lobby" class="screen" data-screen="lobby" hidden>
+      <header class="topbar">
+        <button class="icon-btn back-btn" type="button" data-back="home" aria-label="回首頁"></button>
+        <h2>線上大廳</h2>
+      </header>
+      <div class="lobby-grid">
+        <div class="panel-card">
+          <div class="conn-line" id="lobby-conn" role="status"></div>
+          <label class="field">
+            <span>你的暱稱</span>
+            <input id="lobby-name" maxlength="10" autocomplete="off" placeholder="不填就幫你取一個">
+          </label>
+          <div class="field">
+            <span>選一隻小動物</span>
+            <div class="char-grid small" id="lobby-chars" role="radiogroup" aria-label="選擇角色"></div>
+          </div>
+          <div class="lobby-actions">
+            <button class="btn3d coral" id="lobby-quick" type="button">快速加入</button>
+            <button class="btn3d sea" id="lobby-create" type="button">建立房間</button>
+          </div>
+          <p class="note">線上拍牌以「伺服器收到的先後」判定，網路比較慢的人可能被記成比較晚拍。</p>
+        </div>
+        <div class="panel-card">
+          <h3 class="card-title">房間列表</h3>
+          <ul class="room-list" id="room-list" aria-live="polite"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 線上房間（等待中） ========== -->
+    <section id="screen-room" class="screen" data-screen="room" hidden>
+      <header class="topbar">
+        <button class="icon-btn back-btn" type="button" id="room-leave" aria-label="離開房間"></button>
+        <h2 id="room-title">房間</h2>
+      </header>
+      <div class="room-grid">
+        <div class="panel-card room-main">
+          <div class="role-line" id="room-role"></div>
+          <ul class="seat-list" id="room-seats"></ul>
+          <div class="room-actions" id="room-actions"></div>
+          <div class="host-box" id="room-host"></div>
+          <div class="invite-box" id="room-invite"></div>
+          <div class="spec-line" id="room-specs"></div>
+        </div>
+        <div class="panel-card room-chat-card">
+          <h3 class="card-title">聊天室</h3>
+          <div class="chat" data-chat="room"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 對局 ========== -->
+    <section id="screen-game" class="screen game-screen" data-screen="game" hidden>
+      <aside class="side" id="side" aria-label="對局資訊">
+        <div class="side-head">
+          <button class="icon-btn" id="btn-menu" type="button" aria-label="選單"></button>
+          <div class="side-title wood-sign small"><span>海島心臟病</span></div>
+          <button class="icon-btn side-close" id="side-close" type="button" aria-label="收起資訊"></button>
+        </div>
+        <div class="summary" id="summary"></div>
+        <div class="chat side-chat" data-chat="game" hidden></div>
+      </aside>
+      <button class="icon-btn side-open" id="side-open" type="button" aria-label="打開對局資訊"></button>
+      <button class="icon-btn menu-fab" id="btn-menu-fab" type="button" aria-label="暫停／選單"></button>
+      <button class="icon-btn chat-fab" id="chat-fab" type="button" aria-label="打開聊天室" hidden><span class="badge" id="chat-unread" hidden>0</span></button>
+      <div class="chat-pop" id="chat-pop" hidden>
+        <div class="chat-pop-head"><b>聊天室</b><button class="icon-btn" id="chat-pop-close" type="button" aria-label="關閉聊天室"></button></div>
+        <div class="chat" data-chat="pop"></div>
+      </div>
+      <main class="board" id="board" aria-label="牌桌"></main>
+      <div class="result" id="result" hidden role="dialog" aria-modal="true" aria-labelledby="result-title"></div>
+      <div class="net-banner" id="net-banner" hidden role="status"></div>
+    </section>
+
+    <!-- ========== 設定彈窗 ========== -->
+    <div class="modal" id="settings-modal" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h2 id="settings-title">設定</h2>
+          <button class="icon-btn" type="button" data-close aria-label="關閉設定"></button>
+        </div>
+        <div class="modal-body" id="settings-body"></div>
+      </div>
+    </div>
+
+    <!-- ========== 暫停／選單 ========== -->
+    <div class="modal" id="menu-modal" hidden role="dialog" aria-modal="true" aria-labelledby="menu-title">
+      <div class="modal-card narrow">
+        <div class="modal-head">
+          <h2 id="menu-title">暫停</h2>
+          <button class="icon-btn" type="button" data-close aria-label="關閉"></button>
+        </div>
+        <div class="modal-body menu-body" id="menu-body"></div>
+      </div>
+    </div>
+
+    <div class="toasts" id="toasts" aria-live="polite"></div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/rng.js"></script>
+  <script src="js/rules.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/art.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/table.js"></script>
+  <script src="js/solo.js"></script>
+  <script src="js/net.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
