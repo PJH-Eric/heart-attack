@@ -20,6 +20,8 @@
   }
 
   function rankText(r) { return Art.RANKS[r - 1]; }
+  /** 喊數一律用數字 1～13（牌面上仍是 A、J、Q、K） */
+  function callText(n) { return String(n); }
   function cardText(c) { return Art.SUIT_ZH[c.s] + rankText(c.r); }
 
   /**
@@ -158,7 +160,7 @@
         clearMarks();
         root.Sound.sfx('flip');
         root.Sound.call(e.call);
-        addLog(name(e.seat) + ' 翻出 ' + cardText(e.card) + '（喊 ' + rankText(e.call) + '）');
+        addLog(name(e.seat) + ' 翻出 ' + cardText(e.card) + '（喊 ' + callText(e.call) + '）');
         pulse('.call-num');
       } else if (e.type === 'slap') {
         mark(e.seat, e.order, e.wrong);
@@ -183,7 +185,7 @@
         hideBanner();
         clearMarks();
         root.Sound.sfx('start');
-        addLog((e.auto ? '時間到，系統幫 ' + name(e.seat) + ' ' : name(e.seat) + ' ') + (e.segment === 1 ? '按下開始' : '按下自動發牌') + '，從 A 喊起');
+        addLog((e.auto ? '時間到，系統幫 ' + name(e.seat) + ' ' : name(e.seat) + ' ') + (e.segment === 1 ? '按下開始' : '按下自動發牌') + '，從 1 喊起');
       } else if (e.type === 'win') {
         addLog(name(e.seat) + ' 把牌出完了！');
       }
@@ -213,12 +215,12 @@
       call.classList.toggle('big', !!S().bigCall);
       const num = $('.call-num', board);
       if (v.reveal && v.phase === 'dealing') {
-        num.textContent = rankText(v.reveal.call);
+        num.textContent = callText(v.reveal.call);
         call.classList.remove('idle');
       } else if (v.phase === 'result' && v.reveal) {
-        num.textContent = rankText(v.reveal.call);
+        num.textContent = callText(v.reveal.call);
       } else {
-        num.textContent = 'A';
+        num.textContent = '1';
         call.classList.add('idle');
       }
       $('.call-label', board).textContent = v.phase === 'waitStart' || !v.reveal ? '準備喊' : '喊';
@@ -390,7 +392,7 @@
       summary.innerHTML =
         '<div class="sum-status">' + esc(status) + '</div>' + role +
         '<div class="sum-grid">' +
-          '<div><small>下一張喊</small><b>' + (v.phase === 'dealing' ? rankText(v.nextCall) : 'A') + '</b></div>' +
+          '<div><small>下一張喊</small><b>' + (v.phase === 'dealing' ? callText(v.nextCall) : '1') + '</b></div>' +
           '<div><small>牌堆</small><b>' + v.pileCount + '<i>張</i></b></div>' +
           '<div><small>已翻</small><b>' + v.flips + '<i>張</i></b></div>' +
         '</div>' +

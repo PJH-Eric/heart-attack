@@ -6,14 +6,14 @@
  *
  * 一局的流程（規劃書 §3）：
  *   waitStart  —— 等「本段啟動者」按開始／自動發牌
- *   dealing    —— 依座位順序自動翻牌，同時喊 A、2……K；點數不同時留一小段時間給誤拍
+ *   dealing    —— 依座位順序自動翻牌，同時喊 1、2……13（A＝1、J＝11、Q＝12、K＝13）；點數不同時留一小段時間給誤拍
  *   slapWindow —— 點數＝喊數，所有人搶拍；全員拍完或時間到就結算
  *   result     —— 顯示誰收走牌堆；接著判斷勝負，沒人贏就回 waitStart（由收牌者啟動）
  *   over       —— 有人手牌 0 張，勝負已定
  *
  * 已確認的規則：
  *   - 52 張、無鬼牌；系統決定座位順序，一人一張輪流發完。
- *   - 每段開始（第一段與每次收牌後）都從 A 重新喊。
+ *   - 每段開始（第一段與每次收牌後）都從 1 重新喊。
  *   - 點數相同：最後拍的人收牌；有人沒拍，則從翻牌者往後數，最後一位沒拍的人收牌。
  *   - 點數不同卻拍：第一位誤拍者收牌。
  *   - 收牌放到收牌者手牌底部，順序照翻出的順序，不重洗。
@@ -161,7 +161,7 @@
   function beginSegment(state, now, auto) {
     state.phase = 'dealing';
     state.segment++;
-    state.callIdx = 0;                        /* 每段都從 A 喊起 */
+    state.callIdx = 0;                        /* 每段都從 1 喊起 */
     state.turn = nextWithCards(state, state.starter);
     state.reveal = null;
     state.slaps = [];

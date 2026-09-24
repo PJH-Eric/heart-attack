@@ -119,7 +119,7 @@
    *   auto   —— 裝置有中文語音就用裝置語音，沒有就用內建錄音（預設）
    */
 
-  const SAY = ['A', '二', '三', '四', '五', '六', '七', '八', '九', '十', 'J', 'Q', 'K'];
+  const SAY = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二', '十三'];
   const clipBuf = {};
   let clipsLoading = false;
   let voice = null;
@@ -202,7 +202,7 @@
     else if (!playClip(rank)) speakDevice(rank);
   }
 
-  /** 設定裡的「試聽」：念 A、二、三 */
+  /** 設定裡的「試聽」：念 一、二、三 */
   function previewVoice() {
     unlock();
     const was = settings.voice;

@@ -128,7 +128,7 @@
       '<h3 class="set-group">聲音</h3>' +
       sw('bgm', '背景音樂', 'music') + vol('bgmVol', '音樂音量') +
       sw('sfx', '音效', 'sound') + vol('sfxVol', '音效音量') +
-      sw('voice', '喊數語音', 'voice', '翻牌時念出 A、二、三……K') +
+      sw('voice', '喊數語音', 'voice', '翻牌時念出 1、2、3……13') +
       '<div class="set-row voice-row"><span class="set-text"><b>喊數聲音</b><small id="voice-note"></small></span>' +
       '<button type="button" class="btn3d sea small" id="voice-test">試聽</button></div>' +
       '<div class="seg small voice-seg" role="radiogroup" aria-label="喊數聲音">' +

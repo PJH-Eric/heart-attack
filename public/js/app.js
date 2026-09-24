@@ -269,16 +269,16 @@
       '<ol class="help-steps">' +
       '<li><div class="help-pic">' + Art.cardBackSvg() + '</div><div><h3>1. 發牌</h3>' +
         '<p>一副 52 張撲克牌（沒有鬼牌），系統排好座位順序後，一人一張輪流發完。大家都看不到自己的牌，只知道剩幾張。</p></div></li>' +
-      '<li><div class="help-pic call-demo"><span>喊</span><b>A</b></div><div><h3>2. 按開始</h3>' +
-        '<p>第一順位的人按「開始」，系統就照順序自動幫每個人翻牌，同時喊 A、2、3……10、J、Q、K，再回到 A。</p></div></li>' +
-      '<li><div class="help-pic pair"><div class="call-demo small"><span>喊</span><b>7</b></div>' + card('H', 7) + '</div><div><h3>3. 數字一樣就拍！</h3>' +
+      '<li><div class="help-pic call-demo"><span>喊</span><b>1</b></div><div><h3>2. 按開始</h3>' +
+        '<p>第一順位的人按「開始」，系統就照順序自動幫每個人翻牌，同時喊 1、2、3……13，喊到 13 再回到 1。牌面的 A 算 1、J 算 11、Q 算 12、K 算 13。</p></div></li>' +
+      '<li><div class="help-pic pair"><div class="call-demo small"><span>喊</span><b>11</b></div>' + card('H', 11) + '</div><div><h3>3. 數字一樣就拍！</h3>' +
         '<p>翻出來的點數跟喊的數字一樣（花色不重要），所有人趕快按「拍牌」（鍵盤按空白鍵，也可以直接點牌堆）。</p></div></li>' +
       '<li><div class="help-pic">' + Art.handIcon() + '</div><div><h3>4. 最慢的人收牌</h3>' +
         '<p>最後拍的人（或沒拍到的人）要把中間整疊牌收回去，放到自己的牌底下。</p></div></li>' +
       '<li><div class="help-pic pair"><div class="call-demo small"><span>喊</span><b>5</b></div>' + card('S', 6) + '</div><div><h3>5. 拍錯也要收</h3>' +
         '<p>數字不一樣卻拍下去，第一個拍錯的人收走整疊牌。還沒翻牌時按拍牌不算，也不會被罰。</p></div></li>' +
       '<li><div class="help-pic">' + Art.animalSvg('bunny') + '</div><div><h3>6. 收牌的人接著發</h3>' +
-        '<p>收了牌的人按「自動發牌」，從自己開始、再從 A 重新喊起。誰先把手上的牌出完，誰就贏！</p></div></li>' +
+        '<p>收了牌的人按「自動發牌」，從自己開始、再從 1 重新喊起。誰先把手上的牌出完，誰就贏！</p></div></li>' +
       '</ol>' +
       '<div class="help-tips"><h3>小提醒</h3><ul>' +
         '<li>電腦有四種難度：幼幼班、簡單、普通、困難。幼幼班的翻牌也會放慢。</li>' +
