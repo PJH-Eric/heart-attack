@@ -163,7 +163,9 @@ function createServer(opt) {
       case 'quick': {
         /* 快速加入：找還有空位、沒在對局的房；沒有就自己開一間 */
         const cand = hub.listRooms().filter(r => !r.playing && r.players < r.max);
-        const r = cand.length ? hub.join(p, cand[0].id, 'player') : hub.createRoom(p, {});
+        let r = null;
+        for (const c of cand) { r = hub.join(p, c.id, 'player'); if (r.ok) break; }
+        if (!r || !r.ok) r = hub.createRoom(p, {});
         reply(r);
         afterRoomChange();
         break;

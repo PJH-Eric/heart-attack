@@ -133,8 +133,49 @@ async function solo(browser, base) {
   ok(await page.isHidden('#result') && await page.evaluate(() => Solo._debug.state.seats.reduce((a, s) => a + s.hand.length, 0) === 52), '「再來一局」重新發 52 張');
   await page.keyboard.press('Escape');
   ok(await page.isVisible('#menu-modal'), 'Esc 打開暫停選單');
-  await page.screenshot({ path: path.join(OUT, '平板橫向-暫停.png') });
   await page.click('#m-home');
+  ok(await page.isVisible('#screen-home'), '暫停選單可以回首頁');
+
+  /* 結束方式：打到只剩一人有牌 —— 自己先出完，看離場畫面，再等其他人打完 */
+  await page.click('#go-solo');
+  while (await page.isEnabled('#solo-ai [data-step="1"]')) await page.click('#solo-ai [data-step="1"]');
+  await page.click('[data-end="last"]');
+  await page.click('#solo-diff [data-diff="hard"]');
+  await page.click('#solo-start');
+  await page.evaluate(() => {
+    const g = Solo._debug, st = g.state;
+    const me = st.seats.findIndex(s => s.id === 'me');
+    const all = st.seats.flatMap(s => s.hand).concat(st.pile);
+    st.seats.forEach(s => { s.hand = []; });
+    st.pile = [];
+    /* 自己只留一張不會命中的牌，其他人平分剩下的（全部換成不會命中的點數，電腦也不會亂拍） */
+    st.seats[me].hand = [{ s: 'S', r: me === 0 ? 9 : 9 }];
+    const others = st.seats.map((s, i) => i).filter(i => i !== me);
+    let k = 0;
+    for (const c of all.slice(1)) st.seats[others[k++ % others.length]].hand.push(c);
+    st.starter = me;
+  });
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => Solo._debug.state.seats.find(s => s.id === 'me').out > 0, null, { timeout: 20000 }).catch(() => {});
+  const outInfo = await page.evaluate(() => ({
+    out: Solo._debug.state.seats.find(s => s.id === 'me').out,
+    phase: Solo._debug.state.phase,
+    dis: document.querySelector('.slap-btn').disabled,
+    wait: document.querySelector('.wait-text').textContent,
+    flag: [...document.querySelectorAll('.seat-flag')].map(f => f.textContent).join('|')
+  }));
+  ok(outInfo.out === 1 && outInfo.phase !== 'over', '只剩一人模式：自己出完拿第 1 名，其他人繼續打');
+  ok(outInfo.dis && /第 1 名/.test(outInfo.wait) && /第 1 名/.test(outInfo.flag), '離場後拍牌鈕停用、顯示名次（' + outInfo.wait + '）');
+  await page.screenshot({ path: path.join(OUT, '平板橫向-只剩一人-自己出完.png') });
+  const flipsBefore = await page.evaluate(() => Solo._debug.state.flips);
+  await page.waitForFunction(n => Solo._debug.state.flips > n || Solo._debug.state.phase === 'over', flipsBefore, { timeout: 8000 }).catch(() => {});
+  ok(await page.evaluate(n => Solo._debug.state.flips > n, flipsBefore), '離場後牌局照常進行');
+  await page.evaluate(() => Solo.stop());
+  await page.goto(base);
+  await page.click('#go-solo');
+  await page.click('[data-end="first"]');
+  await page.goto(base);
+  await page.screenshot({ path: path.join(OUT, '平板橫向-暫停.png') });
   ok(await page.isVisible('#screen-home'), '暫停選單可以回首頁');
   await page.close();
 }

@@ -211,6 +211,75 @@ t('手牌 0 張的人還是可以拍牌（誤拍就收牌、贏不了）', () =>
   eq(st.seats[0].hand.length, 1);
 });
 
+console.log('\n[結束方式：打到只剩一人有牌]');
+t('出完的人得到名次並離場，其他人繼續打', () => {
+  const st = rigged([[['S', 9]], [['H', 5], ['H', 9], ['H', 9]], [['D', 9], ['D', 9], ['D', 9]]], { endMode: 'last' });
+  Rules.start(st, 'p0', 0);
+  let now = flipNext(st, 0);             /* p0 出完最後一張 */
+  now = flipNext(st, now + st.pace.flipMs);
+  eq(st.phase, 'dealing', '沒有結束');
+  eq(st.seats[0].out, 1, 'p0 第 1 名');
+  eq(st.finished.join(','), '0');
+  eq(st.events.some(e => e.type === 'out' && e.seat === 0 && e.place === 1), true);
+  eq(st.reveal.by, 1, '下一張由還有牌的人翻');
+});
+t('離場的人不能拍，也不會被算成「沒拍到」而收牌', () => {
+  /* p0 出完離場後，p1 翻出命中；p1、p2 都拍 → 應該立刻結算，最後拍的 p2 收牌 */
+  const st = rigged([[['S', 9]], [['H', 2], ['H', 9]], [['D', 9], ['D', 9]]], { endMode: 'last' });
+  Rules.start(st, 'p0', 0);
+  let now = flipNext(st, 0);
+  now = flipNext(st, now + st.pace.flipMs);      /* p0 離場；p1 翻 H2 喊 2 → 命中 */
+  eq(st.reveal.match, true);
+  eq(Rules.slap(st, 'p0', now + 10, st.reveal.id).reason, 'out');
+  Rules.slap(st, 'p1', now + 20, st.reveal.id);
+  Rules.slap(st, 'p2', now + 30, st.reveal.id);
+  eq(st.phase, 'result', '場上兩人都拍了就結算');
+  eq(st.lastResult.seat, 2);
+  const st2 = rigged([[['S', 9]], [['H', 2], ['H', 9]], [['D', 9], ['D', 9]]], { endMode: 'last' });
+  Rules.start(st2, 'p0', 0);
+  let n2 = flipNext(st2, 0);
+  n2 = flipNext(st2, n2 + st2.pace.flipMs);
+  Rules.slap(st2, 'p1', n2 + 20, st2.reveal.id);
+  Rules.tick(st2, n2 + st2.pace.windowMs);
+  eq(st2.lastResult.seat, 2, '沒拍的是 p2（不是已離場的 p0）');
+});
+t('只剩一人有牌時結束：勝者＝第一個出完，輸家＝最後有牌的人，名次完整', () => {
+  const st = rigged([[['S', 9]], [['H', 5]], [['D', 9], ['D', 9], ['D', 9]]], { endMode: 'last' });
+  Rules.start(st, 'p0', 0);
+  let now = flipNext(st, 0);
+  now = flipNext(st, now + st.pace.flipMs);      /* p0 離場，p1 翻最後一張 */
+  Rules.tick(st, now + st.pace.flipMs);
+  eq(st.phase, 'over');
+  eq(st.winner, 0); eq(st.loser, 2);
+  eq(Rules.publicView(st, now).ranking.join(','), '0,1,2');
+});
+t('預設（有人出完就結束）的名次：勝者在前，其他人照剩餘張數', () => {
+  const st = rigged([[['S', 9]], [['H', 5], ['H', 9], ['H', 9]], [['D', 9], ['D', 9]]]);
+  Rules.start(st, 'p0', 0);
+  const now = flipNext(st, 0);
+  Rules.tick(st, now + st.pace.flipMs);
+  eq(st.phase, 'over');
+  eq(Rules.publicView(st, now).ranking.join(','), '0,2,1');
+});
+t('電腦互打（只剩一人模式）40 局都能打完、名次包含所有人', () => {
+  for (let i = 0; i < 40; i++) {
+    const n = 2 + (i % 3);
+    const ps = ['kid', 'easy', 'normal', 'hard'].slice(0, n).map((l, k) => ({ id: 'a' + k, name: 'a' + k, ai: l }));
+    const st = Rules.create(ps, { seed: 'L' + i, endMode: 'last' });
+    const d = AI.createDriver('L' + i);
+    let now = 0;
+    while (st.phase !== 'over' && now < 40 * 60e3) {
+      now += 20; Rules.tick(st, now);
+      for (const a of d.actions(st, now)) a.type === 'start' ? Rules.start(st, a.id, now) : Rules.slap(st, a.id, now, a.revealId);
+      Rules.tick(st, now);
+      if (!Rules.checkConservation(st)) throw new Error('牌數不守恆');
+    }
+    eq(st.phase, 'over', '第 ' + i + ' 局');
+    eq(st.finished.length, n - 1, '除了最後一人都有名次');
+    eq(new Set(Rules.publicView(st, now).ranking).size, n);
+  }
+});
+
 console.log('\n[公開資訊]');
 t('publicView 不含未翻出的牌、seed，也不透露「這張該拍」', () => {
   const st = rigged([[['S', 1], ['S', 9]], [['H', 9], ['H', 9]]]);

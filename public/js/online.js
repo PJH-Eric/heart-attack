@@ -5,6 +5,7 @@
   const { $, $$, esc, toast, show } = root.UI;
   const Art = root.Art;
   const PACE_NAME = { slow: '悠閒', normal: '普通', fast: '緊張' };
+  const END_NAME = { first: '有人出完就結束', last: '打到只剩一人有牌' };
   const DIFF_NAME = root.Table.DIFF_NAME;
 
   const S = {
@@ -134,7 +135,7 @@
         return '<li class="room-row"><div class="room-meta"><b>' + esc(r.name) + '</b>' +
           '<span class="code">' + r.id + '</span>' +
           '<span class="pill ' + (r.playing ? 'playing' : 'waiting') + '">' + (r.playing ? '對局中' : '等待中') + '</span>' +
-          '<small>玩家 ' + r.players + '/' + r.max + '・觀戰 ' + r.specs + '・節奏' + (PACE_NAME[r.pace] || '') + '</small></div>' +
+          '<small>玩家 ' + r.players + '/' + r.max + '・觀戰 ' + r.specs + '・節奏' + (PACE_NAME[r.pace] || '') + '・' + (END_NAME[r.endMode] || END_NAME.first) + '</small></div>' +
           '<div class="room-btns">' +
           '<button type="button" class="btn3d coral small" data-join="' + r.id + '" data-as="player"' + (r.playing || full ? ' disabled' : '') + '>' + (full ? '已滿' : '加入遊戲') + '</button>' +
           '<button type="button" class="btn3d sea small" data-join="' + r.id + '" data-as="spectator">觀戰</button></div></li>';
@@ -174,7 +175,9 @@
     root.UI.chat.canSend = true;
 
     if (room.game) {
-      if (root.UI.current !== 'game') { $('#result').hidden = true; show('game'); root.App.gameLayout(true); }
+      /* 新的一局開始：還停在上一局結算畫面的人也要自動回到牌桌 */
+      $('#result').hidden = true;
+      if (root.UI.current !== 'game') { show('game'); root.App.gameLayout(true); }
       renderGame(room);
       S.wasInGame = true;
     } else {
@@ -243,7 +246,8 @@
     }
     if (room.lastGame) {
       const w = room.lastGame.seats[room.lastGame.winner];
-      a += '<p class="last-game">上一局：' + esc(w ? w.name : '') + ' 先出完牌獲勝</p>';
+      const lz = room.lastGame.loser != null ? room.lastGame.seats[room.lastGame.loser] : null;
+      a += '<p class="last-game">上一局：' + esc(w ? w.name : '') + ' 先出完牌獲勝' + (lz ? '，' + esc(lz.name) + ' 最後還有牌' : '') + '</p>';
     }
     $('#room-actions').innerHTML = a;
 
@@ -254,8 +258,9 @@
       ? '<h4>房間設定（房主）</h4>' +
         '<div class="set-line"><span>人數上限</span>' + seg('max', [[2, '2 人'], [3, '3 人'], [4, '4 人']], room.max) + '</div>' +
         '<div class="set-line"><span>翻牌節奏</span>' + seg('pace', [['slow', '悠閒'], ['normal', '普通'], ['fast', '緊張']], room.pace) + '</div>' +
+        '<div class="set-line"><span>結束方式</span>' + seg('endMode', [['first', '有人出完就結束'], ['last', '打到只剩一人']], room.endMode) + '</div>' +
         '<div class="set-line"><span>電腦難度</span>' + seg('aiDiff', Object.keys(DIFF_NAME).map(k => [k, DIFF_NAME[k]]), room.aiDiff) + '</div>'
-      : '<p class="host-info">人數上限 ' + room.max + ' 人・節奏' + PACE_NAME[room.pace] + '</p>';
+      : '<p class="host-info">人數上限 ' + room.max + ' 人・節奏' + PACE_NAME[room.pace] + '・' + (END_NAME[room.endMode] || END_NAME.first) + '（房主決定）</p>';
 
     /* 邀請連結 */
     const link = room.invite.active ? inviteLink(room.invite.token) : '';

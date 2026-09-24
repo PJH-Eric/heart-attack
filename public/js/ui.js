@@ -138,7 +138,6 @@
       '<h3 class="set-group">手感與畫面</h3>' +
       sw('vibrate', '拍牌震動', 'feel', '支援的手機／平板才會震') +
       sw('reduceMotion', '減少動態', 'see', '關掉飛牌與晃動動畫') +
-      sw('fourColor', '四色牌', 'see', '方塊改藍色、梅花改綠色，更好分辨') +
       sw('bigCall', '喊數字特大', 'see', '中間的喊數泡泡放大') +
       '<div class="set-actions"><button type="button" class="btn3d sand" id="set-reset">恢復預設</button>' +
       '<button type="button" class="btn3d sea" data-close>完成</button></div>';

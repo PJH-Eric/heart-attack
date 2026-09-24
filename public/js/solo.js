@@ -19,7 +19,7 @@
     }
     const seed = root.RNG.newSeed();
     const pace = root.Rules.DIFFICULTIES[cfg.difficulty].pace;
-    const state = root.Rules.create(players, { seed: seed, pace: pace, autoStartMs: null, now: 0 });
+    const state = root.Rules.create(players, { seed: seed, pace: pace, autoStartMs: null, now: 0, endMode: cfg.endMode });
     const driver = root.AI.createDriver(seed + '-ai');
 
     game = {

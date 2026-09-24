@@ -92,6 +92,13 @@
       root.Store.save(store);
       renderSoloSetup();
     });
+    $('#solo-end').addEventListener('click', e => {
+      const b = e.target.closest('[data-end]');
+      if (!b) return;
+      store.endMode = b.dataset.end;
+      root.Store.save(store);
+      renderSoloSetup();
+    });
     $('#solo-start').onclick = startSolo;
 
     /* 對局畫面：左欄抽屜、聊天彈層 */
@@ -165,6 +172,10 @@
     $('#solo-ai [data-step="-1"]').disabled = store.aiCount <= 1;
     $('#solo-ai [data-step="1"]').disabled = store.aiCount >= 3;
     $$('#solo-diff [data-diff]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.diff === store.difficulty)));
+    $$('#solo-end [data-end]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.end === store.endMode)));
+    $('#solo-end-hint').textContent = store.endMode === 'last'
+      ? '出完的人依序拿名次、離開牌桌，其他人繼續打，直到只剩一個人手上有牌'
+      : '只要有一個人把牌出完，這局就結束';
     $('#solo-diff-hint').textContent = DIFF_HINT[store.difficulty] + '（共 ' + (store.aiCount + 1) + ' 人，每人約 ' + Math.floor(52 / (store.aiCount + 1)) + ' 張）';
   }
 
@@ -175,7 +186,7 @@
     $('#result').hidden = true;
     show('game');
     gameLayout(false);
-    root.Solo.start({ name: nm, char: store.char, aiCount: store.aiCount, difficulty: store.difficulty });
+    root.Solo.start({ name: nm, char: store.char, aiCount: store.aiCount, difficulty: store.difficulty, endMode: store.endMode });
     if (!store.seenHelp) {
       store.seenHelp = true;
       root.Store.save(store);
@@ -264,7 +275,7 @@
   /* ---------- 怎麼玩（靜態圖文） ---------- */
 
   function renderHelp() {
-    const card = (s, r) => '<span class="help-card">' + Art.cardSvg({ s, r }, { fourColor: store.fourColor }) + '</span>';
+    const card = (s, r) => '<span class="help-card">' + Art.cardSvg({ s, r }) + '</span>';
     $('#help-body').innerHTML =
       '<ol class="help-steps">' +
       '<li><div class="help-pic">' + Art.cardBackSvg() + '</div><div><h3>1. 發牌</h3>' +
@@ -282,7 +293,8 @@
       '</ol>' +
       '<div class="help-tips"><h3>小提醒</h3><ul>' +
         '<li>電腦有四種難度：幼幼班、簡單、普通、困難。幼幼班的翻牌也會放慢。</li>' +
-        '<li>右上角齒輪可以開關音樂、音效、喊數語音，也能換成「四色牌」讓花色更好認。</li>' +
+        '<li>結束方式有兩種：「有人出完就結束」，或「打到只剩一人有牌」—— 出完的人依序拿名次離開牌桌，最後還有牌的人就是最後一名。線上由房主決定。</li>' +
+        '<li>右上角齒輪可以開關音樂、音效、喊數語音，也能把喊數字放大。</li>' +
         '<li>線上房間以伺服器收到的先後判定誰先拍；網路比較慢的人可能比較吃虧。</li>' +
       '</ul></div>' +
       '<button type="button" class="btn3d coral btn-wide" id="help-go">我懂了，開始玩！</button>';

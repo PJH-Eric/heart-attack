@@ -2,7 +2,7 @@
  *
  * 不用 emoji、不用圖片檔：系統字型會改變 emoji 長相，SVG 在每台裝置都一樣清楚。
  * 撲克牌採「大字角標」：角落的點數特別大，小朋友一眼就認得出來；
- * 花色除了顏色也靠形狀區分，設定裡還能切換四色牌（方塊藍、梅花綠）。
+ * 花色是標準撲克牌配色：紅心、方塊紅色，黑桃、梅花黑色；四種花色的形狀也各不相同。
  */
 (function (root) {
   'use strict';
@@ -21,11 +21,9 @@
        '<path d="M40 44h20v14H40z"/><path d="M45 62c0 15-5 26-15 33h40c-10-7-15-18-15-33z"/>'
   };
 
-  function suitColor(s, fourColor) {
-    if (s === 'H') return '#D8263F';
-    if (s === 'D') return fourColor ? '#1F6FD1' : '#D8263F';
-    if (s === 'C') return fourColor ? '#16804A' : '#23233A';
-    return '#23233A';
+  /** 標準配色：紅心、方塊＝紅；黑桃、梅花＝黑 */
+  function suitColor(s) {
+    return s === 'H' || s === 'D' ? '#D8263F' : '#23233A';
   }
 
   /** 一個花色，中心在 (cx, cy)，寬 size；flip 會上下顛倒（牌的下半部） */
@@ -36,9 +34,9 @@
     return '<g transform="' + t + '" fill="' + color + '">' + SUIT_PATHS[s] + '</g>';
   }
 
-  function suitIcon(s, fourColor) {
+  function suitIcon(s) {
     return '<svg viewBox="0 0 100 100" class="suit-icon" aria-hidden="true">' +
-      suit(s, 50, 50, 100, suitColor(s, fourColor)) + '</svg>';
+      suit(s, 50, 50, 100, suitColor(s)) + '</svg>';
   }
 
   /* ---------- 撲克牌 ---------- */
@@ -75,11 +73,11 @@
   /**
    * 一張牌的 SVG。
    * @param {{s:string,r:number}} card
-   * @param {{fourColor?:boolean, cls?:string}} opt
+   * @param {{cls?:string}} opt
    */
   function cardSvg(card, opt) {
     opt = opt || {};
-    const col = suitColor(card.s, opt.fourColor);
+    const col = suitColor(card.s);
     const rank = RANKS[card.r - 1];
     const gid = nextId('cf');
     const wide = rank === '10';

@@ -218,6 +218,26 @@ function hubTest() {
   ok(!room.seats.some(s => s.personId === b.id), '斷線太久的人在等待中讓出座位');
   hub.leave(a);
   ok(!hub.rooms.has(room.id), '沒有真人就關房');
+
+  /* 結束方式：打到只剩一人有牌 */
+  const c = hub.identify('cccccccc3', '阿志', 'cat');
+  const d = hub.identify('dddddddd4', '小玉', 'koala');
+  const r2 = hub.createRoom(c, { max: 4 }).room;
+  hub.join(d, r2.id, 'player');
+  ok(!hub.settings(d, { endMode: 'last' }).ok, '只有房主能改結束方式');
+  ok(hub.settings(c, { endMode: 'last' }).ok && r2.endMode === 'last', '房主改成「打到只剩一人有牌」');
+  ok(hub.roomView(r2, d.id).endMode === 'last' && hub.listRooms()[0].endMode === 'last', '玩家與大廳都看得到結束方式');
+  hub.addAI(c, 'hard'); hub.addAI(c, 'easy');
+  hub.markOffline(c.id); hub.markOffline(d.id);
+  c.online = true; d.online = true;          /* 兩位真人不操作：靠代按與沒拍到收牌推進 */
+  hub.setReady(d, true);
+  ok(hub.startGame(c).ok && r2.game.state.endMode === 'last', '開局帶入房主選的結束方式');
+  const st2 = r2.game.state;
+  guard = 0;
+  while (r2.game && guard++ < 400000) { now += 20; hub.tick(now); }
+  ok(r2.lastGame && r2.lastGame.finished.length === 3 && r2.lastGame.loser != null, '打到只剩一人：三人有名次、最後一人是輸家');
+  ok(r2.lastGame.ranking.length === 4 && r2.lastGame.ranking[3] === r2.lastGame.loser, '名次最後一位就是最後有牌的人');
+  void st2;
 }
 
 (async () => {

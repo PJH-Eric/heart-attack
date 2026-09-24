@@ -109,6 +109,7 @@
 
     function trySlap() {
       if (!view || mySeat < 0) return;
+      if (view.seats[mySeat] && view.seats[mySeat].out) return;         /* 出完離場了 */
       if (view.phase !== 'dealing' || !view.reveal) return;           /* 還沒翻牌：不算也不罰 */
       if (slappedReveal === view.reveal.id) return;
       slappedReveal = view.reveal.id;
@@ -124,6 +125,7 @@
       extra = extra || {};
       seatInfo = extra.seatInfo || {};
       const fresh = !view || view.seats.length !== v.seats.length || lastSeq < 0 ||
+        view.gameId !== v.gameId || v.eventSeq < lastSeq ||
         v.seats.some((s, i) => !view.seats[i] || view.seats[i].id !== s.id);
       if (fresh) {
         view = v;
@@ -142,7 +144,9 @@
       /* 新事件 → 動畫與音效 */
       const events = (v.events || []).filter(e => e.seq > lastSeq);
       lastSeq = Math.max(lastSeq, v.eventSeq);
-      for (const e of events) play(e, v, prev);
+      /* 一次來很多事件（例如斷線重連後補上）：畫面照樣更新，但只念最後一張，免得連珠炮 */
+      const lastFlip = events.filter(e => e.type === 'flip').pop();
+      for (const e of events) play(e, v, prev, events.length > 3 && e !== lastFlip);
 
       if (v.pileCount === 0 && pileCards.length && !events.some(e => e.type === 'collect')) {
         pileCards = [];
@@ -151,15 +155,14 @@
       updateStatic(v);
     }
 
-    function play(e, v) {
-      const motion = !S().reduceMotion;
+    function play(e, v, prev, quiet) {
+      const motion = !S().reduceMotion && !quiet;
       if (e.type === 'flip') {
         pileCards.push({ s: e.card.s, r: e.card.r, rot: Math.round((Math.random() * 2 - 1) * 9), from: e.seat });
         if (pileCards.length > 4) pileCards.shift();
         drawPile(motion);
         clearMarks();
-        root.Sound.sfx('flip');
-        root.Sound.call(e.call);
+        if (!quiet) { root.Sound.sfx('flip'); root.Sound.call(e.call); }
         addLog(name(e.seat) + ' 翻出 ' + cardText(e.card) + '（喊 ' + callText(e.call) + '）');
         pulse('.call-num');
       } else if (e.type === 'slap') {
@@ -186,6 +189,12 @@
         clearMarks();
         root.Sound.sfx('start');
         addLog((e.auto ? '時間到，系統幫 ' + name(e.seat) + ' ' : name(e.seat) + ' ') + (e.segment === 1 ? '按下開始' : '按下自動發牌') + '，從 1 喊起');
+      } else if (e.type === 'out') {
+        const txt = name(e.seat) + ' 出完了！第 ' + e.place + ' 名';
+        banner(txt, '');
+        addLog(txt);
+        bubble(e.seat, '第 ' + e.place + ' 名', 'good');
+        root.Sound.sfx('win');
       } else if (e.type === 'win') {
         addLog(name(e.seat) + ' 把牌出完了！');
       }
@@ -199,7 +208,7 @@
         const s = v.seats[i];
         $('.count b', el).textContent = s.count;
         const info = seatInfo[s.id] || {};
-        const flag = info.offline ? '離線' : info.takeover ? '電腦代打' : s.ai ? '電腦・' + (DIFF_NAME[s.ai] || '') : '';
+        const flag = s.out ? '第 ' + s.out + ' 名・出完了' : info.offline ? '離線' : info.takeover ? '電腦代打' : s.ai ? '電腦・' + (DIFF_NAME[s.ai] || '') : '';
         const f = $('.seat-flag', el);
         f.textContent = flag;
         f.hidden = !flag;
@@ -207,6 +216,7 @@
         el.classList.toggle('is-turn', v.phase === 'dealing' && nextFlipper(v) === i);
         el.classList.toggle('is-starter', v.phase === 'waitStart' && v.starter === i);
         el.classList.toggle('is-empty', s.count === 0);
+        el.classList.toggle('is-out', !!s.out);
         el.classList.toggle('winner', v.phase === 'over' && v.winner === i);
       }
 
@@ -239,12 +249,16 @@
       } else if (iStart) {
         wait.textContent = v.segment === 0 ? '你是第一順位，按開始！' : '你收了牌，換你按自動發牌';
       } else wait.textContent = '';
+      const meOut = mySeat >= 0 && v.seats[mySeat].out;
+      if (meOut && v.phase !== 'over') wait.textContent = '你出完了，第 ' + meOut + ' 名！等其他人打完…';
       tickCountdown();
 
       const slapBtn = $('.slap-btn', board);
       if (slapBtn) {
         slapBtn.classList.toggle('idle', !(v.phase === 'dealing' && v.reveal));
         slapBtn.classList.toggle('done', !!(v.reveal && slappedReveal === v.reveal.id && v.phase === 'dealing'));
+        slapBtn.disabled = !!meOut;
+        slapBtn.classList.toggle('out', !!meOut);
       }
 
       renderSummary(v);
@@ -284,11 +298,10 @@
     function drawPile(animateLast) {
       const box = $('.pile-cards', board);
       if (!box) return;
-      const four = !!S().fourColor;
       box.innerHTML = pileCards.map((c, i) => {
         const last = i === pileCards.length - 1;
         return '<div class="pc' + (last ? ' top' : '') + (last && animateLast ? ' deal from-' + fromDir(c.from) : '') +
-          '" style="--r:' + c.rot + 'deg">' + Art.cardSvg(c, { fourColor: four }) + '</div>';
+          '" style="--r:' + c.rot + 'deg">' + Art.cardSvg(c) + '</div>';
       }).join('');
     }
 
@@ -347,7 +360,7 @@
 
     function banner(text, kind) {
       const b = $('.banner', board);
-      b.textContent = text;
+      b.textContent = text.replace(/^你 /, '你');
       b.className = 'banner ' + (kind || '');
       b.hidden = false;
     }
@@ -360,7 +373,7 @@
     }
 
     function addLog(text) {
-      log.push(text);
+      log.push(text.replace(/^你 /, '你'));
       if (log.length > 30) log.shift();
     }
 
@@ -370,6 +383,7 @@
       if (!summary) return;
       let status;
       if (v.phase === 'over') status = name(v.winner) + ' 獲勝！';
+      else if (mySeat >= 0 && v.seats[mySeat].out) status = '你出完了（第 ' + v.seats[mySeat].out + ' 名），觀看其他人打完';
       else if (v.phase === 'waitStart') status = v.starter === mySeat ? '換你按' + (v.segment === 0 ? '開始' : '自動發牌') : '等 ' + name(v.starter) + ' 啟動';
       else if (v.phase === 'result') status = '收牌中…';
       else status = '翻牌中，數字一樣就拍！';
@@ -383,6 +397,7 @@
         const tags = [];
         if (v.phase === 'dealing' && nf === i) tags.push('<i class="tag turn">下一張</i>');
         if (v.phase === 'waitStart' && v.starter === i) tags.push('<i class="tag start">啟動者</i>');
+        if (s.out) tags.push('<i class="tag ready">第 ' + s.out + ' 名</i>');
         rows.push('<li class="' + (i === mySeat ? 'me' : '') + '" style="--seat:' + SEAT_COLORS[i % 4] + '">' +
           '<span class="mini">' + Art.animalSvg(s.char || 'otter') + '</span>' +
           '<span class="nm">' + esc(i === mySeat ? s.name + '（你）' : s.name) + '</span>' + tags.join('') +
@@ -400,6 +415,7 @@
         '<h4>最近發生</h4><ol class="sum-log">' +
           (log.length ? log.slice(-6).reverse().map(t => '<li>' + esc(t) + '</li>').join('') : '<li class="dim">還沒開始</li>') +
         '</ol>' +
+        '<p class="sum-mode">結束方式：' + (v.endMode === 'last' ? '打到只剩一人有牌' : '有人出完就結束') + '</p>' +
         '<p class="sum-keys">空白鍵＝拍牌　Enter＝開始／自動發牌</p>';
     }
 
@@ -417,16 +433,25 @@
   function resultHtml(v, myId, stats) {
     const winner = v.seats[v.winner];
     const me = v.seats.findIndex(s => s.id === myId);
-    const rank = v.seats.map((s, i) => ({ s, i })).sort((a, b) => a.s.count - b.s.count);
-    const title = me < 0 ? winner.name + ' 獲勝！' : me === v.winner ? '你贏了！' : winner.name + ' 先出完了';
+    const order = v.ranking || v.seats.map((s, i) => i).sort((a, b) => v.seats[a].count - v.seats[b].count);
+    const last = v.endMode === 'last';
+    let title;
+    if (me < 0) title = winner.name + ' 獲勝！';
+    else if (me === v.winner) title = '你贏了！';
+    else if (last && me === v.loser) title = '你是最後有牌的人';
+    else if (last) title = '你是第 ' + (order.indexOf(me) + 1) + ' 名';
+    else title = winner.name + ' 先出完了';
+    const sub = last && v.loser != null ? '<p class="result-sub">' + esc(v.seats[v.loser].name) + (v.loser === me ? '（你）' : '') + ' 最後還有 ' + v.seats[v.loser].count + ' 張牌</p>' : '';
     return '<div class="result-card">' +
       '<div class="result-hero">' + Art.animalSvg(winner.char || 'otter', { cls: 'bounce' }) + '</div>' +
-      '<h2 id="result-title">' + esc(title) + '</h2>' +
-      '<ol class="rank-list">' + rank.map((r, k) =>
-        '<li class="' + (r.i === me ? 'me' : '') + '"><span class="no">' + (k + 1) + '</span>' +
-        '<span class="mini">' + Art.animalSvg(r.s.char || 'otter') + '</span>' +
-        '<span class="nm">' + esc(r.s.name) + (r.i === me ? '（你）' : '') + '</span>' +
-        '<b>剩 ' + r.s.count + ' 張</b></li>').join('') + '</ol>' +
+      '<h2 id="result-title">' + esc(title) + '</h2>' + sub +
+      '<ol class="rank-list">' + order.map((i, k) => {
+        const s = v.seats[i];
+        return '<li class="' + (i === me ? 'me' : '') + '"><span class="no">' + (k + 1) + '</span>' +
+          '<span class="mini">' + Art.animalSvg(s.char || 'otter') + '</span>' +
+          '<span class="nm">' + esc(s.name) + (i === me ? '（你）' : '') + '</span>' +
+          '<b>' + (s.count === 0 ? '出完了' : '剩 ' + s.count + ' 張') + '</b></li>';
+      }).join('') + '</ol>' +
       (stats ? '<p class="result-stats">' + esc(stats) + '</p>' : '') +
       '<div class="result-actions" id="result-actions"></div></div>';
   }

@@ -74,7 +74,7 @@
         seenReveal = r.id;
         plan = [];
         state.seats.forEach((s, i) => {
-          if (!s.ai) return;
+          if (!s.ai || s.out) return;            /* 出完離場的電腦不再拍 */
           const d = decide(s.ai, r.card, r.call, rng);
           if (d != null) plan.push({ at: r.at + d, seat: i, revealId: r.id });
         });

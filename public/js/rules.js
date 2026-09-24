@@ -18,6 +18,9 @@
  *   - 點數不同卻拍：第一位誤拍者收牌。
  *   - 收牌放到收牌者手牌底部，順序照翻出的順序，不重洗。
  *   - 先把手牌出完（在判定都結束後仍為 0 張）的人獲勝。
+ *   - 結束方式（endMode，房主／單機設定）：
+ *       first —— 有一個人出完牌，這局就結束
+ *       last  —— 出完的人依序得到名次並離場（不再拍牌），打到只剩一個人有牌才結束
  */
 (function (root, factory) {
   'use strict';
@@ -49,6 +52,8 @@
     hard:   { name: '困難',   pace: 'fast' }
   };
   const DIFFICULTY_LIST = ['kid', 'easy', 'normal', 'hard'];
+  const END_MODES = ['first', 'last'];
+  const END_MODE_NAMES = { first: '有人出完就結束', last: '打到只剩一人有牌' };
 
   function rankLabel(rank) { return RANK_LABELS[rank - 1]; }
   function cardLabel(card) { return SUIT_NAMES[card.s] + rankLabel(card.r); }
@@ -72,6 +77,7 @@
     const seed = opt.seed != null ? String(opt.seed) : RNG.newSeed();
     const rng = RNG.create(seed);
     const pace = Object.assign({}, PACES[opt.pace] || PACES.normal, opt.timing || {});
+    const endMode = END_MODES.includes(opt.endMode) ? opt.endMode : 'first';
 
     /* 1. 系統決定座位順序 */
     const order = rng.shuffle(players.map(p => Object.assign({}, p)));
@@ -79,13 +85,17 @@
     const deck = rng.shuffle(newDeck());
     const seats = order.map((p, i) => ({
       id: p.id, name: p.name || ('玩家' + (i + 1)), char: p.char || null,
-      ai: p.ai || null, hand: []
+      ai: p.ai || null, hand: [], out: 0      /* out：出完後的名次（0＝還在場上） */
     }));
     deck.forEach((card, i) => seats[i % seats.length].hand.push(card));
 
     return {
       seed: seed,
+      /* 對外用的對局代號（跟 seed 無關，猜不出牌序），畫面用來分辨「這是新的一局」 */
+      gameId: Math.random().toString(36).slice(2, 10),
       pace: pace,
+      endMode: endMode,
+      finished: [],             /* 出完牌的座位，依名次排列 */
       autoStartMs: opt.autoStartMs == null ? null : opt.autoStartMs,
       seats: seats,
       pile: [],
@@ -139,11 +149,45 @@
     return -1;
   }
 
-  function finish(state, winnerIdx, now) {
+  function finish(state, winnerIdx, now, loserIdx) {
     state.phase = 'over';
     state.winner = winnerIdx;
+    state.loser = loserIdx == null ? null : loserIdx;
     state.nextAt = 0;
-    push(state, { type: 'win', seat: winnerIdx, at: now });
+    push(state, { type: 'win', seat: winnerIdx, loser: state.loser, at: now });
+  }
+
+  /** 還在場上（沒出完離場）的座位 */
+  function activeSeats(state) {
+    const out = [];
+    state.seats.forEach((s, i) => { if (!s.out) out.push(i); });
+    return out;
+  }
+
+  /**
+   * 判定都結束後檢查有沒有人出完。回傳 true＝這局結束了。
+   * first 以翻牌者為先、再依座位順序挑一位勝者；
+   * last  把所有 0 張的人依同樣順序排進名次，剩一個人有牌就結束。
+   */
+  function settle(state, first, now) {
+    if (state.endMode !== 'last') {
+      const w = findWinner(state, first);
+      if (w >= 0) { finish(state, w, now); return true; }
+      return false;
+    }
+    const n = state.seats.length;
+    for (let k = 0; k < n; k++) {
+      const i = ((first || 0) + k) % n;
+      const s = state.seats[i];
+      if (!s.out && s.hand.length === 0) {
+        state.finished.push(i);
+        s.out = state.finished.length;
+        push(state, { type: 'out', seat: i, place: s.out, at: now });
+      }
+    }
+    const act = activeSeats(state);
+    if (act.length <= 1) { finish(state, state.finished[0], now, act.length ? act[0] : null); return true; }
+    return false;
   }
 
   /* ---------- 玩家動作 ---------- */
@@ -176,6 +220,7 @@
   function slap(state, playerId, now, revealId) {
     const idx = seatIndex(state, playerId);
     if (idx < 0) return { ok: false, reason: 'not-player' };
+    if (state.seats[idx].out) return { ok: false, reason: 'out' };   /* 已經出完離場的人不能拍 */
     const r = state.reveal;
     if (!r || (state.phase !== 'dealing' && state.phase !== 'slapWindow')) {
       return { ok: false, reason: 'no-card' };          /* 還沒翻牌就拍：不算、不罰 */
@@ -193,7 +238,7 @@
     }
 
     push(state, { type: 'slap', seat: idx, order: state.slaps.length, at: now });
-    if (state.slaps.length >= state.seats.length) resolveMatch(state, now);
+    if (state.slaps.length >= activeSeats(state).length) resolveMatch(state, now);
     return { ok: true, order: state.slaps.length };
   }
 
@@ -221,8 +266,7 @@
     if (state.phase === 'dealing') {
       if (now < state.nextAt) return;
       /* 上一張的誤拍時間結束了；翻下一張之前，先看有沒有人已經出完 */
-      const w = findWinner(state, state.reveal ? state.reveal.by : state.starter);
-      if (w >= 0) { finish(state, w, now); return; }
+      if (settle(state, state.reveal ? state.reveal.by : state.starter, now)) return;
       flip(state, now);
       return;
     }
@@ -233,8 +277,7 @@
     if (state.phase === 'result') {
       if (now < state.nextAt) return;
       const by = state.lastResult && state.lastResult.flipper != null ? state.lastResult.flipper : 0;
-      const w = findWinner(state, by);
-      if (w >= 0) { finish(state, w, now); return; }
+      if (settle(state, by, now)) return;
       state.phase = 'waitStart';
       state.waitSince = now;
       state.reveal = null;
@@ -268,9 +311,10 @@
   function resolveMatch(state, now) {
     if (state.phase !== 'slapWindow') return;
     const n = state.seats.length;
+    const act = activeSeats(state);
     const slapped = new Set(state.slaps.map(s => s.seat));
     let loser = -1, reason = 'last';
-    if (slapped.size >= n) {
+    if (slapped.size >= act.length) {
       loser = state.slaps[state.slaps.length - 1].seat;
     } else {
       /* 沒拍的人比拍了的人更慢；多位沒拍時，從翻牌者往後數最後一位 */
@@ -278,7 +322,7 @@
       const by = state.reveal.by;
       for (let k = 0; k < n; k++) {
         const i = (by + k) % n;
-        if (!slapped.has(i)) loser = i;
+        if (!slapped.has(i) && !state.seats[i].out) loser = i;
       }
     }
     collect(state, loser, reason, now);
@@ -311,10 +355,14 @@
     /* slapWindow 對外也叫 dealing：畫面不能因為「這張該拍」而長得不一樣 */
     const phase = state.phase === 'slapWindow' ? 'dealing' : state.phase;
     return {
+      gameId: state.gameId,
       phase: phase,
       seats: state.seats.map(s => ({
-        id: s.id, name: s.name, char: s.char, ai: s.ai, count: s.hand.length
+        id: s.id, name: s.name, char: s.char, ai: s.ai, count: s.hand.length, out: s.out || 0
       })),
+      endMode: state.endMode,
+      finished: state.finished.slice(),
+      ranking: state.phase === 'over' ? ranking(state) : null,
       pileCount: state.pile.length,
       starter: state.starter,
       turn: state.turn,
@@ -324,6 +372,7 @@
       slaps: state.slaps.map(s => s.seat),
       lastResult: state.lastResult,
       winner: state.winner,
+      loser: state.loser == null ? null : state.loser,
       flips: state.flips,
       waitLeft: state.phase === 'waitStart' && state.autoStartMs != null && now != null
         ? Math.max(0, state.autoStartMs - (now - state.waitSince)) : null,
@@ -331,6 +380,14 @@
       eventSeq: state.eventSeq,
       version: state.version
     };
+  }
+
+  /** 最後名次：先出完的依序在前，其餘照剩餘張數少的在前 */
+  function ranking(state) {
+    const done = state.endMode === 'last' ? state.finished.slice() : (state.winner != null ? [state.winner] : []);
+    const rest = state.seats.map((s, i) => i).filter(i => !done.includes(i))
+      .sort((a, b) => state.seats[a].hand.length - state.seats[b].hand.length);
+    return done.concat(rest);
   }
 
   /** 檢查牌數守恆（測試用）：手牌＋牌堆＝52 且不重複 */
@@ -343,7 +400,7 @@
   }
 
   return {
-    SUITS, SUIT_NAMES, RANK_LABELS, PACES, DIFFICULTIES, DIFFICULTY_LIST,
+    SUITS, SUIT_NAMES, RANK_LABELS, PACES, DIFFICULTIES, DIFFICULTY_LIST, END_MODES, END_MODE_NAMES,
     MIN_PLAYERS, MAX_PLAYERS,
     newDeck, create, start, slap, tick, publicView, rankLabel, cardLabel,
     checkConservation, nextWithCards, findWinner
