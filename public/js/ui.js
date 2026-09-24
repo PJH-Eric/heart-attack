@@ -128,7 +128,13 @@
       '<h3 class="set-group">聲音</h3>' +
       sw('bgm', '背景音樂', 'music') + vol('bgmVol', '音樂音量') +
       sw('sfx', '音效', 'sound') + vol('sfxVol', '音效音量') +
-      sw('voice', '喊數語音', 'voice', '翻牌時念出 A、二、三……') +
+      sw('voice', '喊數語音', 'voice', '翻牌時念出 A、二、三……K') +
+      '<div class="set-row voice-row"><span class="set-text"><b>喊數聲音</b><small id="voice-note"></small></span>' +
+      '<button type="button" class="btn3d sea small" id="voice-test">試聽</button></div>' +
+      '<div class="seg small voice-seg" role="radiogroup" aria-label="喊數聲音">' +
+      [['auto', '自動'], ['clip', '遊戲內建'], ['device', '裝置語音']].map(o =>
+        '<button type="button" role="radio" data-voice="' + o[0] + '" aria-checked="' + (store.voiceMode === o[0]) + '">' + o[1] + '</button>').join('') +
+      '</div>' +
       '<h3 class="set-group">手感與畫面</h3>' +
       sw('vibrate', '拍牌震動', 'feel', '支援的手機／平板才會震') +
       sw('reduceMotion', '減少動態', 'see', '關掉飛牌與晃動動畫') +
@@ -143,6 +149,26 @@
       store[k] = e.target.type === 'checkbox' ? e.target.checked : Number(e.target.value);
       onChange(store);
     };
+    const voiceNote = () => {
+      const n = $('#voice-note');
+      if (!n) return;
+      const S = root.Sound;
+      n.textContent = store.voiceMode === 'clip' ? '跟翻牌同時念出，每台裝置都一樣'
+        : store.voiceMode === 'device' ? (S.hasDeviceVoice ? '用這台裝置的中文語音，較自然但可能慢半拍' : '這台裝置找不到中文語音，會改用遊戲內建')
+        : (S.hasDeviceVoice ? '目前使用：裝置中文語音' : '目前使用：遊戲內建（這台裝置沒有中文語音）');
+    };
+    voiceNote();
+    setTimeout(voiceNote, 800);   /* 有些瀏覽器的語音清單要晚一點才載入 */
+    body.querySelector('.voice-seg').onclick = e => {
+      const b = e.target.closest('[data-voice]');
+      if (!b) return;
+      store.voiceMode = b.dataset.voice;
+      body.querySelectorAll('[data-voice]').forEach(x => x.setAttribute('aria-checked', String(x === b)));
+      onChange(store);
+      voiceNote();
+      root.Sound.previewVoice();
+    };
+    $('#voice-test').onclick = () => root.Sound.previewVoice();
     $('#set-reset').onclick = () => {
       root.Store.resetSettings(store);
       buildSettings(store, onChange);

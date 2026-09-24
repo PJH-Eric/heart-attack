@@ -572,3 +572,6 @@ body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after 
 @media (orientation: portrait) {
   .chat-pop { top: calc(70px + var(--safe-t)); bottom: auto; height: min(360px, 42dvh); }
 }
+
+.voice-row { padding-left: 50px; }
+.voice-seg { margin: 6px 0 4px 50px; }

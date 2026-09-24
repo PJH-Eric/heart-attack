@@ -61,5 +61,6 @@ npm run test:online  # 只跑線上
 
 ## 資產
 
-所有美術（撲克牌、動物、圖示）都是程式內手繪 SVG；音樂與音效用 Web Audio 即時合成，喊數語音用瀏覽器內建語音，
-沒有外部素材與授權問題。要換成正式美術或音檔，只需替換 `public/js/art.js` 與 `public/js/audio.js`。
+所有美術（撲克牌、動物、圖示）都是程式內手繪 SVG；音樂與音效用 Web Audio 即時合成；喊數語音有兩種來源：
+內建錄音（`public/js/voice-clips.js`，用開源 espeak-ng 離線合成 A、二……十、J、Q、K 共 13 段，跟翻牌同時念出）
+和裝置的中文語音。設定裡的「喊數聲音」可選自動／遊戲內建／裝置語音，並可試聽。沒有外部素材與授權問題。要換成正式美術或音檔，只需替換 `public/js/art.js`、`public/js/audio.js`；換真人喊數錄音就把 `voice-clips.js` 裡 13 段 mp3（base64）換掉。

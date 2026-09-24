@@ -7,6 +7,7 @@
     bgm: true, bgmVol: 0.3,
     sfx: true, sfxVol: 0.7,
     voice: true,          /* 喊數語音 */
+    voiceMode: 'auto',    /* auto｜clip 內建錄音｜device 裝置語音 */
     vibrate: true,
     reduceMotion: false,
     fourColor: false,     /* 四色牌：方塊藍、梅花綠（色彩輔助） */

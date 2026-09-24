@@ -5,13 +5,13 @@
  *
  * - 瀏覽器規定要等使用者第一次點擊才能出聲 → unlock() 綁在第一次點擊。
  * - 背景音樂與音效分開開關、分開音量，設定立即生效。
- * - 喊數語音用瀏覽器內建的 speechSynthesis（zh-TW），可在設定關掉。
+ * - 喊數語音：內建錄音（voice-clips.js）或裝置的中文語音，可在設定切換或關掉。
  */
 (function (root) {
   'use strict';
 
   let ctx = null, master = null, musicBus = null, sfxBus = null;
-  let settings = { bgm: true, bgmVol: 0.3, sfx: true, sfxVol: 0.7, voice: true };
+  let settings = { bgm: true, bgmVol: 0.3, sfx: true, sfxVol: 0.7, voice: true, voiceMode: 'auto' };
   let musicTimer = null, musicStep = 0;
 
   function ensure() {
@@ -29,6 +29,8 @@
   function unlock() {
     const c = ensure();
     if (c && c.state === 'suspended') c.resume();
+    loadClips();
+    unlockSpeech();
     if (settings.bgm) startMusic();
   }
 
@@ -110,32 +112,118 @@
     if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
   }
 
-  /* ---------- 喊數語音 ---------- */
+  /* ---------- 喊數語音 ----------
+   * 兩種來源：
+   *   clip   —— 內建錄音（voice-clips.js），跟翻牌同一瞬間播出，每台裝置都一樣
+   *   device —— 瀏覽器／系統的中文語音，比較自然，但有的裝置沒有中文語音、或會慢半拍
+   *   auto   —— 裝置有中文語音就用裝置語音，沒有就用內建錄音（預設）
+   */
 
   const SAY = ['A', '二', '三', '四', '五', '六', '七', '八', '九', '十', 'J', 'Q', 'K'];
+  const clipBuf = {};
+  let clipsLoading = false;
   let voice = null;
+  const synth = root.speechSynthesis || null;
+
   function pickVoice() {
-    if (!root.speechSynthesis) return null;
-    const list = root.speechSynthesis.getVoices() || [];
-    return list.find(v => /zh[-_]TW/i.test(v.lang)) || list.find(v => /^zh/i.test(v.lang)) || null;
+    if (!synth) return null;
+    const list = synth.getVoices() || [];
+    return list.find(v => /zh[-_]TW/i.test(v.lang)) ||
+      list.find(v => /zh[-_](HK|Hant)/i.test(v.lang)) ||
+      list.find(v => /^(zh|cmn)/i.test(v.lang)) || null;
   }
-  if (root.speechSynthesis && root.speechSynthesis.addEventListener) {
-    root.speechSynthesis.addEventListener('voiceschanged', () => { voice = pickVoice(); });
+  if (synth) {
+    voice = pickVoice();
+    if (synth.addEventListener) synth.addEventListener('voiceschanged', () => { voice = pickVoice(); });
+  }
+
+  function b64ToBuf(b64) {
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out.buffer;
+  }
+
+  function loadClips() {
+    if (clipsLoading || !ctx || !root.VoiceClips) return;
+    clipsLoading = true;
+    for (const k in root.VoiceClips) {
+      try {
+        const p = ctx.decodeAudioData(b64ToBuf(root.VoiceClips[k]), b => { clipBuf[k] = b; }, () => {});
+        if (p && p.then) p.then(b => { clipBuf[k] = b; }).catch(() => {});
+      } catch (e) { /* 這一段解不開就算了，會改用裝置語音 */ }
+    }
+  }
+
+  function playClip(rank) {
+    const b = clipBuf[rank];
+    if (!ctx || !b) return false;
+    const src = ctx.createBufferSource();
+    src.buffer = b;
+    const g = ctx.createGain();
+    g.gain.value = 1.25;
+    src.connect(g); g.connect(sfxBus);
+    src.start(ctx.currentTime + 0.01);
+    playClip.count = (playClip.count || 0) + 1;
+    return true;
+  }
+
+  function speakDevice(rank) {
+    if (!synth || !root.SpeechSynthesisUtterance) return false;
+    voice = voice || pickVoice();
+    try {
+      /* Chrome 閒置一陣子語音會卡住，先 resume；還在念上一個數字就直接打斷 */
+      if (synth.speaking || synth.pending) synth.cancel();
+      synth.resume();
+      const u = new root.SpeechSynthesisUtterance(SAY[rank - 1]);
+      u.lang = voice ? voice.lang : 'zh-TW';
+      if (voice) u.voice = voice;
+      u.rate = 1.3;
+      u.pitch = 1.25;
+      u.volume = Math.min(1, settings.sfxVol + 0.3);
+      u.onerror = e => { if (e && e.error !== 'interrupted' && e.error !== 'canceled') playClip(rank); };
+      synth.speak(u);
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function voiceSource() {
+    const mode = settings.voiceMode || 'auto';
+    if (mode === 'clip') return 'clip';
+    if (mode === 'device') return synth ? 'device' : 'clip';
+    return voice ? 'device' : 'clip';
   }
 
   function call(rank) {
-    if (!settings.voice || !settings.sfx || !root.speechSynthesis || !root.SpeechSynthesisUtterance) return;
-    try {
-      root.speechSynthesis.cancel();
-      const u = new root.SpeechSynthesisUtterance(SAY[rank - 1]);
-      u.lang = 'zh-TW';
-      u.rate = 1.35;
-      u.volume = Math.min(1, settings.sfxVol + 0.2);
-      voice = voice || pickVoice();
-      if (voice) u.voice = voice;
-      root.speechSynthesis.speak(u);
-    } catch (e) { /* 有些瀏覽器沒有語音，靜靜略過 */ }
+    if (!settings.voice || !settings.sfx) return;
+    ensure();
+    loadClips();
+    if (voiceSource() === 'device') { if (!speakDevice(rank)) playClip(rank); }
+    else if (!playClip(rank)) speakDevice(rank);
   }
 
-  root.Sound = { unlock, apply, sfx, call, stopMusic, get settings() { return settings; } };
+  /** 設定裡的「試聽」：念 A、二、三 */
+  function previewVoice() {
+    unlock();
+    const was = settings.voice;
+    settings.voice = true;
+    [1, 2, 3].forEach((r, i) => setTimeout(() => { const s0 = settings.sfx; settings.sfx = true; call(r); settings.sfx = s0; }, 150 + i * 750));
+    setTimeout(() => { settings.voice = was; }, 150 + 3 * 750);
+  }
+
+  /** 第一次點擊時先念一個無聲的字，iPhone／iPad 才會允許之後自動念 */
+  function unlockSpeech() {
+    if (!synth || !root.SpeechSynthesisUtterance || unlockSpeech.done) return;
+    unlockSpeech.done = true;
+    try { const u = new root.SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); } catch (e) { /* 忽略 */ }
+  }
+
+  root.Sound = {
+    unlock, apply, sfx, call, previewVoice, stopMusic,
+    get settings() { return settings; },
+    get hasDeviceVoice() { return !!voice; },
+    get voiceSource() { return voiceSource(); },
+    get clipsReady() { return Object.keys(clipBuf).length; },
+    get clipPlays() { return playClip.count || 0; }
+  };
 })(typeof self !== 'undefined' ? self : this);

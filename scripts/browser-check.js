@@ -93,6 +93,27 @@ async function solo(browser, base) {
   await page.reload();
   ok(await page.evaluate(() => JSON.parse(localStorage.getItem('heart-attack')).bgm === false), '重新整理後設定仍保留');
 
+  /* 喊數語音：內建錄音要解得開，翻牌時真的有念 */
+  await page.click('#btn-settings');
+  await page.click('[data-voice="clip"]');
+  await page.waitForFunction(() => Sound.clipsReady === 13, null, { timeout: 5000 }).catch(() => {});
+  ok(await page.evaluate(() => Sound.clipsReady === 13), '13 段內建喊數錄音（A～K）都能解碼');
+  await page.click('#voice-test');
+  await page.waitForTimeout(2000);
+  ok(await page.evaluate(() => Sound.clipPlays >= 3), '「試聽」念出 A、二、三');
+  await page.keyboard.press('Escape');
+  await page.click('#go-solo');
+  await page.click('#solo-start');
+  const before = await page.evaluate(() => Sound.clipPlays);
+  const sb0 = await page.$('.start-btn:not([hidden])');
+  if (sb0) await sb0.click({ force: true });
+  await page.waitForTimeout(3500);
+  const flips = await page.evaluate(() => Solo._debug.state.flips);
+  const plays = await page.evaluate(() => Sound.clipPlays) - before;
+  ok(flips > 0 && plays >= flips - 1, '每翻一張牌就喊一次數字（翻 ' + flips + ' 張、喊 ' + plays + ' 次）');
+  await page.evaluate(() => Solo.stop());
+  await page.goto(base);
+
   await page.click('#go-help');
   ok((await page.textContent('#help-body')).includes('最慢的人收牌'), '說明頁有完整的文字教學');
   await page.click('#help-go');
