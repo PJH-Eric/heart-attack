@@ -18,6 +18,8 @@
     $$('.screen').forEach(s => { s.hidden = s.dataset.screen !== name; });
     current = name;
     document.body.dataset.screen = name;
+    const lobbyLink = $('#lobby-home-link');
+    if (lobbyLink) lobbyLink.hidden = name !== 'home';
     listeners.forEach(fn => fn(name));
     const h = $('.screen:not([hidden]) h2, .screen:not([hidden]) h1');
     if (h) { h.setAttribute('tabindex', '-1'); try { h.focus({ preventScroll: true }); } catch (e) { /* 舊瀏覽器 */ } }

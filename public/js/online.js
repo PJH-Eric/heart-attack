@@ -371,7 +371,7 @@
     box.hidden = false;
     $('#res-room').onclick = () => { box.hidden = true; endTable(); if (S.room) { show('room'); renderRoom(S.room); } else show('lobby'); };
     $('#res-leave').onclick = () => { box.hidden = true; leaveRoom(); };
-    $('#res-room').focus();
+    $('#res-room').focus({ preventScroll: true });
   }
 
   function endTable() {

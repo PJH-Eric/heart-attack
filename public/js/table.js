@@ -52,29 +52,33 @@
       const pos = positions(n);
 
       board.className = 'board n' + n + (mySeat < 0 ? ' spectating' : '');
-      board.innerHTML =
+      /* .board 是 container（量牌桌實際空間），版面排在裡面的 .tgrid */
+      board.innerHTML = '<div class="tgrid">' +
         '<div class="opps">' + order.map((si, k) => seatHtml(v, si, 'pos-' + pos[k])).join('') + '</div>' +
         '<div class="center">' +
-          '<div class="call" aria-live="off"><span class="call-label">喊</span><b class="call-num">A</b></div>' +
-          '<div class="pile-wrap">' +
-            '<div class="pile" aria-label="牌堆">' +
-              '<div class="pile-under"></div><div class="pile-cards"></div><div class="slap-marks"></div>' +
+          '<div class="center-inner">' +
+            '<div class="call" aria-live="off"><span class="call-label">喊</span><b class="call-num">1</b></div>' +
+            '<div class="pile-wrap">' +
+              '<div class="pile" aria-label="牌堆">' +
+                '<div class="pile-under"></div><div class="pile-cards"></div><div class="slap-marks"></div>' +
+              '</div>' +
+              '<div class="pile-info"><span class="stack">' + Art.stackIcon() + '</span>牌堆 <b class="pile-n">0</b> 張</div>' +
             '</div>' +
-            '<div class="pile-info"><span class="stack">' + Art.stackIcon() + '</span>牌堆 <b class="pile-n">0</b> 張</div>' +
           '</div>' +
-          '<div class="banner" hidden></div>' +
+          '<div class="wait-box">' +
+            '<button type="button" class="btn3d coral start-btn" hidden>開始</button>' +
+            '<div class="wait-text" aria-live="polite"></div>' +
+            '<div class="banner" hidden></div>' +
+          '</div>' +
         '</div>' +
         '<div class="me-area">' +
           seatHtml(v, base, 'me') +
-          '<div class="me-actions">' +
-            '<button type="button" class="btn3d coral start-btn" hidden>開始</button>' +
-            '<div class="wait-text" aria-live="polite"></div>' +
-          '</div>' +
           (mySeat >= 0
             ? '<button type="button" class="slap-btn" aria-label="拍牌（空白鍵）" aria-keyshortcuts="Space">' +
-              Art.handIcon() + '<span>拍牌</span></button>'
+              Art.handIcon() + '<span>拍牌</span></button>' +
+              '<div class="out-badge" hidden></div>'
             : '<div class="spec-badge">' + Art.icon('eye') + '<span>你是觀戰者</span></div>') +
-        '</div>';
+        '</div></div>';
 
       const slapBtn = $('.slap-btn', board);
       if (slapBtn) {
@@ -91,9 +95,9 @@
       const me = si === mySeat;
       return '<div class="seat ' + cls + '" data-seat="' + si + '" style="--seat:' + SEAT_COLORS[si % 4] + '">' +
         '<div class="avatar">' + Art.animalSvg(s.char || 'otter') + '</div>' +
-        '<div class="seat-tag"><b class="name">' + esc(me ? s.name + '（你）' : s.name) + '</b>' +
+        '<div class="seat-body"><div class="seat-tag"><b class="name">' + esc(me ? s.name + '（你）' : s.name) + '</b>' +
         '<span class="count">' + Art.stackIcon() + '<b>' + s.count + '</b></span></div>' +
-        '<span class="seat-flag"></span>' +
+        '<span class="seat-flag"></span></div>' +
         '<div class="bubble" hidden></div>' +
         '</div>';
     }
@@ -250,7 +254,13 @@
         wait.textContent = v.segment === 0 ? '你是第一順位，按開始！' : '你收了牌，換你按自動發牌';
       } else wait.textContent = '';
       const meOut = mySeat >= 0 && v.seats[mySeat].out;
-      if (meOut && v.phase !== 'over') wait.textContent = '你出完了，第 ' + meOut + ' 名！等其他人打完…';
+      $('.center', board).classList.toggle('waiting', v.phase === 'waitStart');
+      $('.wait-box', board).classList.toggle('idle', v.phase !== 'waitStart');
+      const outBadge = $('.out-badge', board);
+      if (outBadge) {
+        outBadge.hidden = !meOut;
+        if (meOut) outBadge.innerHTML = '<b>第 ' + meOut + ' 名</b><span>' + (v.phase === 'over' ? '出完了！' : '出完了，等其他人打完') + '</span>';
+      }
       tickCountdown();
 
       const slapBtn = $('.slap-btn', board);
@@ -258,7 +268,7 @@
         slapBtn.classList.toggle('idle', !(v.phase === 'dealing' && v.reveal));
         slapBtn.classList.toggle('done', !!(v.reveal && slappedReveal === v.reveal.id && v.phase === 'dealing'));
         slapBtn.disabled = !!meOut;
-        slapBtn.classList.toggle('out', !!meOut);
+        slapBtn.hidden = !!meOut;
       }
 
       renderSummary(v);

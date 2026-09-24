@@ -160,12 +160,12 @@ async function solo(browser, base) {
   const outInfo = await page.evaluate(() => ({
     out: Solo._debug.state.seats.find(s => s.id === 'me').out,
     phase: Solo._debug.state.phase,
-    dis: document.querySelector('.slap-btn').disabled,
-    wait: document.querySelector('.wait-text').textContent,
+    dis: document.querySelector('.slap-btn').disabled && document.querySelector('.slap-btn').hidden,
+    wait: document.querySelector('.out-badge').hidden ? '' : document.querySelector('.out-badge').textContent,
     flag: [...document.querySelectorAll('.seat-flag')].map(f => f.textContent).join('|')
   }));
   ok(outInfo.out === 1 && outInfo.phase !== 'over', '只剩一人模式：自己出完拿第 1 名，其他人繼續打');
-  ok(outInfo.dis && /第 1 名/.test(outInfo.wait) && /第 1 名/.test(outInfo.flag), '離場後拍牌鈕停用、顯示名次（' + outInfo.wait + '）');
+  ok(outInfo.dis && /第 1 名/.test(outInfo.wait) && /第 1 名/.test(outInfo.flag), '離場後拍牌鈕換成名次標示（' + outInfo.wait + '）');
   await page.screenshot({ path: path.join(OUT, '平板橫向-只剩一人-自己出完.png') });
   const flipsBefore = await page.evaluate(() => Solo._debug.state.flips);
   await page.waitForFunction(n => Solo._debug.state.flips > n || Solo._debug.state.phase === 'over', flipsBefore, { timeout: 8000 }).catch(() => {});

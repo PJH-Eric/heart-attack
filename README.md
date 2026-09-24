@@ -40,7 +40,11 @@ npm start            # 或 node server.js；換埠號：PORT=4000 npm start
 npm run verify       # 規則＋電腦、線上房間、無頭瀏覽器（沒有 Playwright 會自動略過）
 npm test             # 只跑規則與電腦
 npm run test:online  # 只跑線上
+npm run test:rwd     # RWD 全畫面檢查：12 種尺寸 × 21 個畫面（約 15 分鐘；加 -- --shots 存全部截圖）
 ```
+
+RWD 版面的做法：牌桌用 container query 量「牌桌實際拿到的空間」決定排法（直長／圍桌／矮），
+所有尺寸跟著牌桌大小縮放，所以同一套版面在小手機到大桌機都成立。
 
 瀏覽器檢查的截圖會存到 `screenshots/`。
 

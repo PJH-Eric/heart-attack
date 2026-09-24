@@ -10,7 +10,8 @@
     "test:online": "node scripts/online-check.js",
     "test:browser": "node scripts/browser-check.js",
     "verify": "node tests/verify.js && node scripts/online-check.js && node scripts/browser-check.js",
-    "inject": "node scripts/inject-server-url.js"
+    "inject": "node scripts/inject-server-url.js",
+    "test:rwd": "node scripts/rwd-check.js"
   },
   "engines": {
     "node": ">=22"

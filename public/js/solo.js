@@ -98,7 +98,7 @@
     box.hidden = false;
     $('#res-again').onclick = () => { box.hidden = true; start(game.cfg); };
     $('#res-home').onclick = () => { box.hidden = true; stop(); root.UI.show('home'); };
-    $('#res-again').focus();
+    $('#res-again').focus({ preventScroll: true });
   }
 
   /** silent：只停時鐘不開選單（例如打開設定彈窗時） */
