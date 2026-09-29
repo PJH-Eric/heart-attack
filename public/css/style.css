@@ -164,6 +164,9 @@ button:disabled { cursor: not-allowed; }
 .home-tag { margin: 0; text-align: center; font-weight: 800; color: #fff; text-shadow: 0 2px 0 rgba(0,60,80,.4); font-size: 1.05rem; line-height: 1.5; }
 .home-actions { width: 100%; display: grid; gap: 16px; margin-top: 6px; }
 .home-stats { margin: 4px 0 0; color: var(--ink-soft); font-weight: 700; }
+/* 「怎麼玩」「我的拍速」是次要動作：並排成一列，放在兩顆主按鈕下面 */
+.home-sub { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.home-sub .btn3d.btn-big { font-size: 1.1rem; padding-left: .5em; padding-right: .5em; }
 @media (min-width: 900px) and (orientation: landscape) {
   .home-wrap { max-width: 980px; min-height: calc(100dvh - 40px); align-content: center; display: grid; grid-template-columns: 1.1fr 1fr; grid-template-areas: "title title" "hero actions" "tag actions" "stats actions"; column-gap: 32px; align-items: center; }
   .title-sign { grid-area: title; justify-self: center; }
@@ -712,8 +715,6 @@ body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after 
 }
 
 /* ---------- 拍速 ---------- */
-.speed-link { justify-self: center; align-self: center; margin-top: 2px; }
-@media (min-width: 900px) and (orientation: landscape) { .speed-link { grid-area: actions; align-self: end; margin-top: 0; } }
 .sum-grid.speed b { font-size: 1.15rem; }
 .speed-box { margin: 4px 0 8px; text-align: left; }
 .speed-box h3 { margin: 6px 0; font-size: 1.05rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
