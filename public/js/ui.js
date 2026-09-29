@@ -226,5 +226,138 @@
     }
   };
 
-  root.UI = { $, $$, esc, show, onShow, get current() { return current; }, modal, anyModalOpen, toast, vibrate, randomName, charPicker, setChar, buildSettings, chat };
+  /* ---------- 自製下拉選單（不用原生 <select>，外觀跟遊戲一致） ----------
+   * 觸發鈕：<button class="dd-btn" data-dd="群組" data-key="唯一鍵" data-value="目前值">
+   * 選項清單是一個全域浮層（#dd-pop），用 position:fixed 貼在按鈕旁邊，不會被卡片裁掉；
+   * 畫面重繪（例如房間資料更新）後呼叫 dropdown.refresh()，開著的清單會跟上新的按鈕。
+   * 鍵盤：↑↓ 移動、Enter／空白鍵 選取、Esc 關閉、Home／End；點外面也會關。
+   */
+  const dropdown = (() => {
+    const groups = {};          /* name → { options:[{value,label,desc,cls}], onPick } */
+    let pop = null, open = null, active = 0;
+
+    function ensure() {
+      if (pop) return pop;
+      pop = document.createElement('ul');
+      pop.id = 'dd-pop';
+      pop.className = 'dd-pop';
+      pop.setAttribute('role', 'listbox');
+      pop.hidden = true;
+      document.body.appendChild(pop);
+      pop.addEventListener('pointerdown', e => e.preventDefault());       /* 不要讓按鈕先失焦 */
+      pop.addEventListener('click', e => {
+        const li = e.target.closest('[role=option]');
+        if (li) pick(li.dataset.value);
+      });
+      document.addEventListener('pointerdown', e => {
+        if (open && !pop.contains(e.target) && !e.target.closest('.dd-btn')) close(false);
+      }, true);
+      window.addEventListener('resize', () => { if (open) place(); });
+      window.addEventListener('scroll', () => { if (open) place(); }, true);
+      document.addEventListener('click', e => {
+        const b = e.target.closest('.dd-btn');
+        if (!b) return;
+        if (open && open.key === b.dataset.key) close(true); else show(b);
+      });
+      document.addEventListener('keydown', onKey, true);
+      return pop;
+    }
+
+    function define(name, options, onPick) { groups[name] = { options, onPick }; ensure(); }
+
+    /** 按鈕的 HTML（給畫面組字串用） */
+    function button(name, key, value, label) {
+      const g = groups[name];
+      const o = g.options.find(x => x.value === value) || g.options[0];
+      return '<button type="button" class="dd-btn ' + (o.cls || '') + '" data-dd="' + name + '" data-key="' + esc(key) + '" data-value="' + esc(o.value) + '"' +
+        ' aria-haspopup="listbox" aria-expanded="false" aria-label="' + esc(label || '') + '：' + esc(o.label) + '">' +
+        (o.icon || '') + '<span class="dd-text">' + esc(o.label) + '</span>' +
+        '<svg class="dd-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+    }
+
+    function btnEl() { return open && document.querySelector('.dd-btn[data-key="' + CSS.escape(open.key) + '"]'); }
+
+    function show(b) {
+      ensure();
+      const g = groups[b.dataset.dd];
+      if (!g) return;
+      open = { key: b.dataset.key, name: b.dataset.dd, value: b.dataset.value };
+      active = Math.max(0, g.options.findIndex(o => o.value === open.value));
+      pop.innerHTML = g.options.map((o, i) =>
+        '<li role="option" id="dd-opt-' + i + '" data-value="' + esc(o.value) + '" class="' + (o.cls || '') + (i === active ? ' active' : '') + '" aria-selected="' + (o.value === open.value) + '">' +
+        (o.icon || '') + '<span class="dd-opt-text"><b>' + esc(o.label) + '</b>' + (o.desc ? '<small>' + esc(o.desc) + '</small>' : '') + '</span>' +
+        (o.value === open.value ? '<svg class="dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '') + '</li>').join('');
+      pop.hidden = false;
+      pop.setAttribute('aria-activedescendant', 'dd-opt-' + active);
+      document.querySelectorAll('.dd-btn[aria-expanded="true"]').forEach(x => x.setAttribute('aria-expanded', 'false'));
+      b.setAttribute('aria-expanded', 'true');
+      place();
+    }
+
+    /** 貼在按鈕下方；下方放不下就翻到上方；左右不超出畫面 */
+    function place() {
+      const b = btnEl();
+      if (!b) { close(false); return; }
+      const r = b.getBoundingClientRect();
+      const w = Math.min(innerWidth - 16, Math.max(r.width, 140));
+      pop.style.width = w + 'px';
+      const h = pop.offsetHeight;
+      const below = innerHeight - r.bottom, above = r.top;
+      const top = below >= h + 12 || below >= above ? r.bottom + 6 : r.top - h - 6;
+      pop.style.top = Math.max(8, Math.min(top, innerHeight - h - 8)) + 'px';
+      pop.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px';
+    }
+
+    function setActive(i) {
+      const items = pop.querySelectorAll('[role=option]');
+      active = (i + items.length) % items.length;
+      items.forEach((li, k) => li.classList.toggle('active', k === active));
+      pop.setAttribute('aria-activedescendant', 'dd-opt-' + active);
+      items[active].scrollIntoView({ block: 'nearest' });
+    }
+
+    function pick(value) {
+      if (!open) return;
+      const g = groups[open.name], key = open.key;
+      close(true);
+      if (value !== undefined && g.onPick) g.onPick(key, value);
+    }
+
+    function close(refocus) {
+      if (!open) return;
+      const b = btnEl();
+      if (b) { b.setAttribute('aria-expanded', 'false'); if (refocus) b.focus(); }
+      open = null;
+      if (pop) pop.hidden = true;
+    }
+
+    function onKey(e) {
+      const b = e.target.closest && e.target.closest('.dd-btn');
+      if (!open) {
+        if (b && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); show(b); }
+        return;
+      }
+      const n = pop.querySelectorAll('[role=option]').length;
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(true); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); setActive(active + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(active - 1); }
+      else if (e.key === 'Home') { e.preventDefault(); setActive(0); }
+      else if (e.key === 'End') { e.preventDefault(); setActive(n - 1); }
+      else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); pick(pop.querySelectorAll('[role=option]')[active].dataset.value); }
+      else if (e.key === 'Tab') close(false);
+    }
+
+    /** 畫面重繪後：開著的清單跟上新按鈕；按鈕不見了就關掉 */
+    function refresh() {
+      if (!open) return;
+      const b = btnEl();
+      if (!b) { close(false); return; }
+      b.setAttribute('aria-expanded', 'true');
+      place();
+    }
+
+    return { define, button, refresh, close, get isOpen() { return !!open; } };
+  })();
+
+  root.UI = { $, $$, esc, show, onShow, get current() { return current; }, modal, anyModalOpen, toast, vibrate, randomName, charPicker, setChar, buildSettings, chat, dropdown };
 })(typeof self !== 'undefined' ? self : this);

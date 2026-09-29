@@ -49,10 +49,13 @@
       else root.Net.send({ type: 'join', roomId: b.dataset.join, as: b.dataset.as });
     });
     $('#screen-room').addEventListener('click', onRoomClick);
-    $('#screen-room').addEventListener('change', e => {
-      const sel = e.target.closest('[data-ai-diff]');
-      if (sel) root.Net.send({ type: 'aiDiff', id: sel.dataset.aiDiff, diff: sel.value });
-    });
+    /* 房主替電腦換難度：簡單的自製下拉選單（不用原生 <select>） */
+    root.UI.dropdown.define('ai-diff', [
+      { value: 'kid', label: '幼幼班', cls: 'lv-kid' },
+      { value: 'easy', label: '簡單', cls: 'lv-easy' },
+      { value: 'normal', label: '普通', cls: 'lv-normal' },
+      { value: 'hard', label: '困難', cls: 'lv-hard' }
+    ], (id, diff) => root.Net.send({ type: 'aiDiff', id, diff }));
     $('#lobby-name').addEventListener('change', saveProfile);
   }
 
@@ -218,9 +221,7 @@
       if (s.id === room.hostId) tags.push('<i class="tag host">房主</i>');
       if (s.kind === 'ai' && me.host) {
         /* 房主可以替每個電腦各自選難度 */
-        tags.push('<label class="ai-diff-pick"><span class="sr-only">' + esc(s.name) + ' 的難度</span><select data-ai-diff="' + s.id + '">' +
-          Object.keys(DIFF_NAME).map(k => '<option value="' + k + '"' + (k === s.diff ? ' selected' : '') + '>' + DIFF_NAME[k] + '</option>').join('') +
-          '</select></label>');
+        tags.push(root.UI.dropdown.button('ai-diff', s.id, s.diff, esc(s.name) + ' 的難度'));
       } else if (s.kind === 'ai') tags.push('<i class="tag ai">電腦・' + DIFF_NAME[s.diff] + '</i>');
       else if (!s.online) tags.push('<i class="tag off">離線</i>');
       else if (s.id === room.hostId) tags.push('<i class="tag ready">開局者</i>');
@@ -236,6 +237,7 @@
         (me.host ? '<button type="button" class="btn3d sand small" data-act="add-ai">' + Art.icon('robot') + '加電腦</button>' : '') + '</li>';
     }
     $('#room-seats').innerHTML = h;
+    root.UI.dropdown.refresh();
 
     /* 主要按鈕 */
     let a = '';

@@ -790,14 +790,6 @@ html { background: #E3BC7E; }
 .ai-diff-list .seg { flex: 1; }
 @media (max-width: 420px) { .ai-no { width: 3.6em; font-size: .9rem; } }
 
-/* 等待室：房主替每個電腦選難度 */
-.ai-diff-pick select {
-  min-height: 40px; border: 2px solid #9FB4EA; border-radius: 12px; background: #E4ECFF; color: #3654A8;
-  font-weight: 800; font-size: .85rem; padding: 0 26px 0 10px; cursor: pointer;
-  appearance: none; -webkit-appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, #3654A8 50%), linear-gradient(135deg, #3654A8 50%, transparent 50%);
-  background-position: calc(100% - 13px) 50%, calc(100% - 8px) 50%; background-size: 5px 5px; background-repeat: no-repeat;
-}
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (max-width: 520px) {
   .diff-all { flex-direction: column; align-items: stretch; gap: 4px; }
@@ -807,3 +799,44 @@ html { background: #E3BC7E; }
   .ai-diff-list li { flex-direction: column; align-items: stretch; gap: 2px; }
   .ai-no { width: auto; font-size: .85rem; color: var(--ink-soft); }
 }
+
+/* ---------- 自製下拉選單 ---------- */
+.dd-btn {
+  --c: #3654A8; --bg: #E4ECFF; --bd: #9FB4EA;
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  min-height: 42px; padding: 0 10px 0 10px; border-radius: 14px;
+  border: 2px solid var(--bd); background: var(--bg); color: var(--c);
+  font-weight: 900; font-size: .88rem; box-shadow: 0 3px 0 var(--bd);
+  transition: transform .08s, box-shadow .08s;
+}
+.dd-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--bd); }
+.dd-btn .dd-chev { width: 16px; height: 16px; transition: transform .15s; }
+.dd-btn[aria-expanded="true"] .dd-chev { transform: rotate(180deg); }
+.dd-btn[aria-expanded="true"] { box-shadow: 0 0 0 3px rgba(255,212,71,.8), 0 3px 0 var(--bd); }
+.dd-pips { display: inline-flex; gap: 2px; }
+.dd-pips i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .25; }
+.dd-pips i.on { opacity: 1; }
+.lv-kid { --c: #1F7A45; --bg: #DDF5E5; --bd: #8FD4A6; }
+.lv-easy { --c: #1C6FA8; --bg: #E1F2FF; --bd: #93C8EE; }
+.lv-normal { --c: #8A5A00; --bg: #FFF1C2; --bd: #EFCB63; }
+.lv-hard { --c: #B7352B; --bg: #FFE3DE; --bd: #F2A197; }
+.dd-pop {
+  position: fixed; z-index: 95; margin: 0; padding: 6px; list-style: none;
+  max-height: min(320px, 60dvh); overflow-y: auto;
+  background: var(--paper); border: 3px solid var(--wood-light); border-radius: 18px;
+  box-shadow: 0 6px 0 rgba(122,78,42,.35), 0 16px 30px rgba(0,40,60,.22);
+  animation: dd-in .14s ease-out;
+}
+@keyframes dd-in { from { opacity: 0; transform: translateY(-6px) scale(.98); } }
+.dd-pop li {
+  display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 10px; border-radius: 12px;
+  color: var(--c, var(--ink)); cursor: pointer; border: 2px solid transparent;
+}
+.dd-pop li + li { margin-top: 3px; }
+.dd-pop li.active, .dd-pop li:hover { background: var(--bg, #F4ECDC); border-color: var(--bd, transparent); }
+.dd-pop li[aria-selected="true"] { background: var(--bg); border-color: var(--bd); }
+.dd-opt-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.dd-opt-text b { font-size: .98rem; }
+.dd-opt-text small { font-size: .78rem; font-weight: 700; color: var(--ink-soft); }
+.dd-check { width: 20px; height: 20px; flex: none; }
+.dd-pop .dd-pips i { width: 8px; height: 8px; }

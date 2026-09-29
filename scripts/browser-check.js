@@ -234,11 +234,32 @@ async function online(browser, base) {
   await A.waitForSelector('#screen-room:not([hidden])');
   ok(true, '建立房間進入等待室');
   await A.click('[data-act="add-ai"]');
-  await A.waitForSelector('.seat-row select[data-ai-diff]');
+  await A.waitForSelector('.seat-row .dd-btn');
   ok(true, '房主可以加電腦');
-  await A.selectOption('.seat-row select[data-ai-diff]', 'kid');
+  ok(!(await A.$('#screen-room select')), '難度選單不是原生 <select>');
+  await A.click('.seat-row .dd-btn');
+  ok(await A.isVisible('#dd-pop') && (await A.$$('#dd-pop [role=option]')).length === 4, '點開自製選單，列出四段難度');
+  await A.screenshot({ path: path.join(OUT, '線上-桌機-電腦難度選單.png') });
+  await A.click('#dd-pop [data-value="kid"]');
   await A.waitForFunction(() => Online.room.seats.some(s => s.kind === 'ai' && s.diff === 'kid'));
-  ok(true, '房主可以替這個電腦選難度（幼幼班）');
+  ok(await A.isHidden('#dd-pop') && (await A.textContent('.seat-row .dd-btn')).includes('幼幼班'), '點選項後改成幼幼班、選單收起');
+  /* 鍵盤：↓ 打開、↓↓ 移動、Enter 選取；Esc 關閉 */
+  await A.focus('.seat-row .dd-btn');
+  await A.keyboard.press('ArrowDown');
+  await A.keyboard.press('ArrowDown');
+  await A.keyboard.press('ArrowDown');
+  await A.keyboard.press('Enter');
+  await A.waitForFunction(() => Online.room.seats.some(s => s.kind === 'ai' && s.diff === 'normal'));
+  ok(true, '鍵盤也能選（幼幼班 → 往下兩格＝普通）');
+  await A.click('.seat-row .dd-btn');
+  await A.keyboard.press('Escape');
+  ok(await A.isHidden('#dd-pop'), 'Esc 關閉選單');
+  await A.click('.seat-row .dd-btn');
+  await A.mouse.click(5, 300);
+  ok(await A.isHidden('#dd-pop'), '點外面關閉選單');
+  await A.click('.seat-row .dd-btn');
+  await A.click('#dd-pop [data-value="kid"]');
+  await A.waitForFunction(() => Online.room.seats.some(s => s.kind === 'ai' && s.diff === 'kid'));
   const link = await A.inputValue('#invite-url');
   ok(/invite=/.test(link), '有邀請連結可以複製');
   await A.screenshot({ path: path.join(OUT, '線上-桌機-等待室.png') });
@@ -256,7 +277,7 @@ async function online(browser, base) {
   await C.click('.invite-card button[data-as="spectator"]');
   await C.waitForSelector('#screen-room:not([hidden])');
   ok((await C.textContent('#room-role')).includes('觀戰'), '用同一個連結選觀戰 → 觀戰者');
-  ok((await C.textContent('#room-seats')).includes('電腦・幼幼班') && !(await C.$('#room-seats select')), '其他人看得到電腦難度但不能改');
+  ok((await C.textContent('#room-seats')).includes('電腦・幼幼班') && !(await C.$('#room-seats .dd-btn')), '其他人看得到電腦難度但不能改');
 
   await B.click('[data-act="ready"]');
   await A.waitForSelector('[data-act="start"]:not([disabled])');
