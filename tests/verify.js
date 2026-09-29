@@ -280,6 +280,50 @@ t('電腦互打（只剩一人模式）40 局都能打完、名次包含所有�
   }
 });
 
+console.log('\n[反應時間]');
+t('拍對時記下反應時間：沒帶本機時間就用規則核心的時間差', () => {
+  const st = rigged([[['S', 1], ['S', 9]], [['H', 9], ['H', 9]], [['D', 9]]]);
+  Rules.start(st, 'p0', 0);
+  const now = flipNext(st, 0);
+  Rules.slap(st, 'p1', now + 420, st.reveal.id);
+  Rules.slap(st, 'p2', now + 610, st.reveal.id, 580);        /* 帶本機量到的 580ms（合理） */
+  eq(st.stats[1].hits, 1); eq(st.stats[1].best, 420); eq(st.stats[1].last, 420);
+  eq(st.stats[2].best, 580, '合理的本機時間優先');
+  eq(st.events.filter(e => e.type === 'slap').map(e => e.rt).join(','), '420,580', '事件帶秒數給畫面');
+});
+t('本機時間不合理（比伺服器經過時間還長、快到不像人）就不採用', () => {
+  const st = rigged([[['S', 1], ['S', 9]], [['H', 9], ['H', 9]], [['D', 9]]]);
+  Rules.start(st, 'p0', 0);
+  const now = flipNext(st, 0);
+  Rules.slap(st, 'p1', now + 300, st.reveal.id, 900);          /* 比經過時間長 → 用 300 */
+  Rules.slap(st, 'p2', now + 500, st.reveal.id, 10);           /* 快到不像人 → 用 500 */
+  eq(st.stats[1].best, 300); eq(st.stats[2].best, 500);
+});
+t('統計：平均、最快、拍錯、沒拍到都算對', () => {
+  const st = rigged([[['S', 1], ['S', 2], ['S', 9], ['S', 9]], [['H', 9], ['H', 5], ['H', 9]], [['D', 9], ['D', 9]]]);
+  Rules.start(st, 'p0', 0);
+  let now = flipNext(st, 0);                                   /* p0 翻 S1 喊 1 → 命中 */
+  Rules.slap(st, 'p1', now + 400, st.reveal.id);
+  Rules.slap(st, 'p0', now + 600, st.reveal.id);
+  Rules.tick(st, now + st.pace.windowMs);                      /* p2 沒拍到 → 收牌 */
+  eq(st.stats[2].missed, 1);
+  now = now + st.pace.windowMs + st.pace.resultMs;
+  Rules.tick(st, now);
+  Rules.start(st, 'p2', now);
+  now = flipNext(st, now);                                     /* p2 翻 D9 喊 1 → 沒中 */
+  Rules.slap(st, 'p1', now + 200, st.reveal.id);               /* p1 拍錯 */
+  eq(st.stats[1].wrong, 1);
+  const v = Rules.publicView(st, now);
+  eq(v.stats[1].hits, 1); eq(v.stats[1].avg, 400); eq(v.stats[0].avg, 600); eq(v.stats[2].avg, null);
+});
+t('電腦的反應時間也會記下，而且困難比幼幼班快', () => {
+  const r = simulate(['kid', 'hard'], 'rt-sim');
+  const v = Rules.publicView(r.st, r.now);
+  const kid = v.stats[r.st.seats.findIndex(s => s.ai === 'kid')], hard = v.stats[r.st.seats.findIndex(s => s.ai === 'hard')];
+  ok(kid.hits > 0 && hard.hits > 0, '兩邊都有拍對');
+  ok(hard.avg < kid.avg, '困難平均 ' + hard.avg + 'ms < 幼幼班 ' + kid.avg + 'ms');
+});
+
 console.log('\n[公開資訊]');
 t('publicView 不含未翻出的牌、seed，也不透露「這張該拍」', () => {
   const st = rigged([[['S', 1], ['S', 9]], [['H', 9], ['H', 9]]]);

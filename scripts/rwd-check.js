@@ -47,6 +47,16 @@ function audit(opts) {
     return true;
   };
   if (document.documentElement.scrollWidth > W + 1) out.push('水平溢出 ' + document.documentElement.scrollWidth + '>' + W);
+  /* 彈窗、結算卡要完整在畫面內，內容太長就要能在裡面捲 */
+  for (const sel of ['.modal:not([hidden]) .modal-card', '.result:not([hidden]) .result-card']) {
+    const el = document.querySelector(sel);
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    if (r.bottom > H + 1 || r.top < -1) out.push('彈窗超出畫面（捲不到）：' + sel);
+    const body = el.querySelector('.modal-body') || el;
+    const cs = getComputedStyle(body);
+    if (body.scrollHeight > body.clientHeight + 2 && !/(auto|scroll)/.test(cs.overflowY)) out.push('內容太長但不能捲：' + sel);
+  }
 
   const scope = document.querySelector('.modal:not([hidden])') || document.querySelector('.result:not([hidden])') ||
     document.querySelector('.screen:not([hidden])');
@@ -245,6 +255,17 @@ async function soloGame(page, base, n, stateName) {
     await page.goto(base);
     await page.click('#go-help');
     await check('說明');
+    await page.goto(base);
+    await page.evaluate(() => {
+      const d = JSON.parse(localStorage.getItem('heart-attack'));
+      const h = Array.from({ length: 20 }, (_, i) => ({ d: '2026-09-' + String(10 + i).padStart(2, '0'), kind: ['kid', 'easy', 'normal', 'hard', 'online'][i % 5], avg: 420 + (i * 37) % 300, best: 300 + (i * 23) % 120, hits: 8, wrong: 1, missed: 2 }));
+      const byKind = {}; for (const k of ['kid', 'easy', 'normal', 'hard', 'online']) byKind[k] = { best: 320, hits: 32, sum: 32 * 520, bestAvg: 430 };
+      d.reaction = { best: 300, hits: 160, sum: 160 * 520, wrong: 20, missed: 40, games: 20, byKind, history: h };
+      localStorage.setItem('heart-attack', JSON.stringify(d));
+    });
+    await page.reload();
+    await page.click('#go-speed');
+    await check('我的拍速');
 
     for (const n of [2, 3, 4]) {
       await soloGame(page, base, n, 'wait');

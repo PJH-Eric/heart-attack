@@ -96,6 +96,8 @@
       pace: pace,
       endMode: endMode,
       finished: [],             /* 出完牌的座位，依名次排列 */
+      /* 每人本局的拍牌統計（反應時間＝牌翻出來到拍下去，毫秒） */
+      stats: seats.map(() => ({ hits: 0, wrong: 0, missed: 0, sum: 0, best: null, last: null })),
       autoStartMs: opt.autoStartMs == null ? null : opt.autoStartMs,
       seats: seats,
       pile: [],
@@ -217,7 +219,20 @@
    * 拍牌。
    * @param {number} revealId 玩家看到的那張牌的序號（線上要帶，防止拍到上一張）
    */
-  function slap(state, playerId, now, revealId) {
+  /**
+   * 這一拍的反應時間。
+   * 真人可以帶「本機量到的時間」clientRt（牌畫到螢幕上 → 按下去，不含網路延遲），
+   * 但不能比伺服器看到的經過時間還長（多 80ms 寬限），也不能快到不像人（< 60ms）；
+   * 不合理或沒帶就用規則核心自己的時間差。
+   */
+  function reactionOf(state, now, clientRt) {
+    const elapsed = Math.max(0, now - state.reveal.at);
+    const rt = Number(clientRt);
+    if (clientRt != null && isFinite(rt) && rt >= 60 && rt <= elapsed + 80) return Math.round(rt);
+    return Math.max(60, Math.round(elapsed));
+  }
+
+  function slap(state, playerId, now, revealId, clientRt) {
     const idx = seatIndex(state, playerId);
     if (idx < 0) return { ok: false, reason: 'not-player' };
     if (state.seats[idx].out) return { ok: false, reason: 'out' };   /* 已經出完離場的人不能拍 */
@@ -228,16 +243,23 @@
     if (revealId != null && revealId !== r.id) return { ok: false, reason: 'stale' };
     if (state.slaps.some(s => s.seat === idx)) return { ok: false, reason: 'dup' };
 
-    state.slaps.push({ seat: idx, at: now });
+    const rt = reactionOf(state, now, clientRt);
+    state.slaps.push({ seat: idx, at: now, rt: rt });
+    const st = state.stats[idx];
 
     if (!r.match) {
       /* 點數不同卻拍：第一位誤拍者收牌 */
-      push(state, { type: 'slap', seat: idx, order: state.slaps.length, wrong: true, at: now });
+      st.wrong++;
+      push(state, { type: 'slap', seat: idx, order: state.slaps.length, wrong: true, rt: rt, at: now });
       collect(state, idx, 'wrong', now);
       return { ok: true, wrong: true };
     }
 
-    push(state, { type: 'slap', seat: idx, order: state.slaps.length, at: now });
+    st.hits++;
+    st.sum += rt;
+    st.best = st.best == null ? rt : Math.min(st.best, rt);
+    st.last = rt;
+    push(state, { type: 'slap', seat: idx, order: state.slaps.length, rt: rt, at: now });
     if (state.slaps.length >= activeSeats(state).length) resolveMatch(state, now);
     return { ok: true, order: state.slaps.length };
   }
@@ -319,6 +341,7 @@
     } else {
       /* 沒拍的人比拍了的人更慢；多位沒拍時，從翻牌者往後數最後一位 */
       reason = 'miss';
+      act.forEach(i => { if (!slapped.has(i)) state.stats[i].missed++; });
       const by = state.reveal.by;
       for (let k = 0; k < n; k++) {
         const i = (by + k) % n;
@@ -360,6 +383,7 @@
       seats: state.seats.map(s => ({
         id: s.id, name: s.name, char: s.char, ai: s.ai, count: s.hand.length, out: s.out || 0
       })),
+      stats: state.stats.map(statView),
       endMode: state.endMode,
       finished: state.finished.slice(),
       ranking: state.phase === 'over' ? ranking(state) : null,
@@ -379,6 +403,13 @@
       events: state.events.slice(-12),
       eventSeq: state.eventSeq,
       version: state.version
+    };
+  }
+
+  function statView(st) {
+    return {
+      hits: st.hits, wrong: st.wrong, missed: st.missed,
+      avg: st.hits ? Math.round(st.sum / st.hits) : null, best: st.best, last: st.last
     };
   }
 
@@ -402,7 +433,7 @@
   return {
     SUITS, SUIT_NAMES, RANK_LABELS, PACES, DIFFICULTIES, DIFFICULTY_LIST, END_MODES, END_MODE_NAMES,
     MIN_PLAYERS, MAX_PLAYERS,
-    newDeck, create, start, slap, tick, publicView, rankLabel, cardLabel,
+    newDeck, create, start, slap, tick, publicView, statView, rankLabel, cardLabel,
     checkConservation, nextWithCards, findWinner
   };
 });

@@ -13,12 +13,20 @@
     const others = Art.ANIMALS.filter(a => a.id !== cfg.char);
     /* 電腦的角色隨機挑，不跟玩家撞 */
     for (let i = others.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [others[i], others[j]] = [others[j], others[i]]; }
+    /* 每個電腦各自的難度；全部一樣就用那個難度記戰績，不一樣就記成「混合」 */
+    const ORDER = root.Rules.DIFFICULTY_LIST;
+    const diffs = (cfg.aiDiffs && cfg.aiDiffs.length ? cfg.aiDiffs : [cfg.difficulty || 'normal']).slice(0, cfg.aiCount);
+    while (diffs.length < cfg.aiCount) diffs.push(diffs[diffs.length - 1]);
+    cfg.aiDiffs = diffs;
+    cfg.kind = diffs.every(d => d === diffs[0]) ? diffs[0] : 'mixed';
     const players = [{ id: 'me', name: cfg.name, char: cfg.char }];
     for (let i = 0; i < cfg.aiCount; i++) {
-      players.push({ id: 'ai' + i, name: others[i].name, char: others[i].id, ai: cfg.difficulty });
+      players.push({ id: 'ai' + i, name: others[i].name, char: others[i].id, ai: diffs[i] });
     }
     const seed = root.RNG.newSeed();
-    const pace = root.Rules.DIFFICULTIES[cfg.difficulty].pace;
+    /* 翻牌節奏跟著最簡單的電腦：有幼幼班電腦在，小朋友也跟得上 */
+    const easiest = ORDER.find(k => diffs.includes(k)) || 'normal';
+    const pace = root.Rules.DIFFICULTIES[easiest].pace;
     const state = root.Rules.create(players, { seed: seed, pace: pace, autoStartMs: null, now: 0, endMode: cfg.endMode });
     const driver = root.AI.createDriver(seed + '-ai');
 
@@ -28,7 +36,7 @@
       table: root.Table.create($('#board'), $('#summary'), {
         myId: 'me',
         settings: () => root.App.store,
-        onSlap: revealId => { if (game && !game.paused) { root.Rules.slap(game.state, 'me', game.clock, revealId); draw(); } },
+        onSlap: (revealId, rt) => { if (game && !game.paused) { root.Rules.slap(game.state, 'me', game.clock, revealId, rt); draw(); } },
         onStart: () => pressStart()
       })
     };
@@ -85,13 +93,15 @@
   function showResult(v) {
     if (!game) return;
     const win = v.winner === game.table.mySeat;
-    root.Store.record(root.App.store, game.cfg.difficulty, win);
+    root.Store.record(root.App.store, game.cfg.kind, win);
     root.Sound.sfx(win ? 'win' : 'lose');
-    const st = root.App.store.stats[game.cfg.difficulty] || { play: 0, win: 0 };
-    const diffName = root.Rules.DIFFICULTIES[game.cfg.difficulty].name;
+    const st = root.App.store.stats[game.cfg.kind] || { play: 0, win: 0 };
+    const diffName = game.cfg.kind === 'mixed' ? '混合難度' : root.Rules.DIFFICULTIES[game.cfg.kind].name;
     const box = $('#result');
+    const me = v.seats.findIndex(s => s.id === 'me');
+    const rec = root.Store.recordReaction(root.App.store, game.cfg.kind, v.stats[me]);
     box.innerHTML = root.Table.resultHtml(v, 'me',
-      '這局一共翻了 ' + v.flips + ' 張牌｜' + diffName + '：玩了 ' + st.play + ' 局、贏 ' + st.win + ' 局');
+      '這局一共翻了 ' + v.flips + ' 張牌｜' + diffName + '：玩了 ' + st.play + ' 局、贏 ' + st.win + ' 局', rec);
     $('#result-actions').innerHTML =
       '<button type="button" class="btn3d coral" id="res-again">再來一局</button>' +
       '<button type="button" class="btn3d sand" id="res-home">回首頁</button>';

@@ -20,6 +20,9 @@
   }
 
   function rankText(r) { return Art.RANKS[r - 1]; }
+  /** 毫秒 → 「0.42 秒」 */
+  function sec(ms) { return ms == null ? '—' : (ms / 1000).toFixed(2) + ' 秒'; }
+  function num(ms) { return ms == null ? '—' : (ms / 1000).toFixed(2); }
   /** 喊數一律用數字 1～13（牌面上仍是 A、J、Q、K） */
   function callText(n) { return String(n); }
   function cardText(c) { return Art.SUIT_ZH[c.s] + rankText(c.r); }
@@ -27,7 +30,7 @@
   /**
    * @param {HTMLElement} board
    * @param {HTMLElement} summary
-   * @param {{ myId:string|null, onSlap:(revealId:number)=>void, onStart:()=>void, settings:()=>object, online?:boolean }} opt
+   * @param {{ myId:string|null, onSlap:(revealId:number, rt:number|null)=>void, onStart:()=>void, settings:()=>object, online?:boolean }} opt
    */
   function create(board, summary, opt) {
     let view = null;
@@ -40,6 +43,7 @@
     let waitBase = null;      /* { left, at } 自動發牌倒數 */
     let seatInfo = {};        /* 線上：{ [id]: { offline, takeover } } */
     let flyToken = 0;
+    let shownAt = null;       /* { id, t } 目前這張牌畫到畫面上的時間 */
 
     const S = () => opt.settings() || {};
 
@@ -120,7 +124,9 @@
       const btn = $('.slap-btn', board);
       if (btn) { btn.classList.remove('pressed'); void btn.offsetWidth; btn.classList.add('pressed'); }
       root.UI.vibrate(35);
-      opt.onSlap(view.reveal.id);
+      /* 反應時間在這台裝置上量：牌畫到畫面上 → 按下去，不含網路延遲 */
+      const rt = shownAt && shownAt.id === view.reveal.id ? Math.round(performance.now() - shownAt.t) : null;
+      opt.onSlap(view.reveal.id, rt);
     }
 
     /* ---------- 繪製 ---------- */
@@ -165,6 +171,7 @@
         pileCards.push({ s: e.card.s, r: e.card.r, rot: Math.round((Math.random() * 2 - 1) * 9), from: e.seat });
         if (pileCards.length > 4) pileCards.shift();
         drawPile(motion);
+        shownAt = { id: e.revealId, t: performance.now() };
         clearMarks();
         if (!quiet) { root.Sound.sfx('flip'); root.Sound.call(e.call); }
         addLog(name(e.seat) + ' 翻出 ' + cardText(e.card) + '（喊 ' + callText(e.call) + '）');
@@ -173,7 +180,7 @@
         mark(e.seat, e.order, e.wrong);
         root.Sound.sfx('slap');
         if (e.wrong) root.Sound.sfx('wrong');
-        bubble(e.seat, e.wrong ? '拍錯了！' : '拍！' + e.order, e.wrong ? 'bad' : '');
+        bubble(e.seat, e.wrong ? '拍錯了！' : '拍！' + e.order + (e.rt != null ? '・' + (e.rt / 1000).toFixed(2) + '秒' : ''), e.wrong ? 'bad' : '');
         if (e.seat === mySeat && !e.wrong) root.UI.vibrate(20);
       } else if (e.type === 'collect') {
         const who = name(e.seat);
@@ -421,12 +428,24 @@
           '<div><small>牌堆</small><b>' + v.pileCount + '<i>張</i></b></div>' +
           '<div><small>已翻</small><b>' + v.flips + '<i>張</i></b></div>' +
         '</div>' +
+        mySpeed(v) +
         '<h4>翻牌順序</h4><ol class="sum-seats">' + rows.join('') + '</ol>' +
         '<h4>最近發生</h4><ol class="sum-log">' +
           (log.length ? log.slice(-6).reverse().map(t => '<li>' + esc(t) + '</li>').join('') : '<li class="dim">還沒開始</li>') +
         '</ol>' +
         '<p class="sum-mode">結束方式：' + (v.endMode === 'last' ? '打到只剩一人有牌' : '有人出完就結束') + '</p>' +
         '<p class="sum-keys">空白鍵＝拍牌　Enter＝開始／自動發牌</p>';
+    }
+
+    /** 左欄：你這局的拍速 */
+    function mySpeed(v) {
+      if (mySeat < 0 || !v.stats || !v.stats[mySeat]) return '';
+      const st = v.stats[mySeat];
+      return '<h4>你這局的拍速</h4><div class="sum-grid speed">' +
+        '<div><small>平均</small><b>' + (st.avg == null ? '—' : (st.avg / 1000).toFixed(2)) + '<i>秒</i></b></div>' +
+        '<div><small>最快</small><b>' + (st.best == null ? '—' : (st.best / 1000).toFixed(2)) + '<i>秒</i></b></div>' +
+        '<div><small>拍對／錯</small><b>' + st.hits + '<i>／' + st.wrong + '</i></b></div>' +
+        '</div>';
     }
 
     function destroy() { board.innerHTML = ''; if (summary) summary.innerHTML = ''; view = null; lastSeq = -1; }
@@ -440,7 +459,8 @@
   }
 
   /** 結算畫面（勝利者大頭貼＋名次＋這局統計） */
-  function resultHtml(v, myId, stats) {
+  function resultHtml(v, myId, stats, extra) {
+    extra = extra || {};
     const winner = v.seats[v.winner];
     const me = v.seats.findIndex(s => s.id === myId);
     const order = v.ranking || v.seats.map((s, i) => i).sort((a, b) => v.seats[a].count - v.seats[b].count);
@@ -462,9 +482,24 @@
           '<span class="nm">' + esc(s.name) + (i === me ? '（你）' : '') + '</span>' +
           '<b>' + (s.count === 0 ? '出完了' : '剩 ' + s.count + ' 張') + '</b></li>';
       }).join('') + '</ol>' +
+      speedHtml(v, me, extra) +
       (stats ? '<p class="result-stats">' + esc(stats) + '</p>' : '') +
       '<div class="result-actions" id="result-actions"></div></div>';
   }
 
-  root.Table = { create, resultHtml, SEAT_COLORS, DIFF_NAME };
+  /** 結算的「拍速」：平均快的在前；沒拍對過的排最後 */
+  function speedHtml(v, me, extra) {
+    if (!v.stats) return '';
+    const rows = v.seats.map((s, i) => ({ s, i, st: v.stats[i] }))
+      .sort((a, b) => (a.st.avg == null) - (b.st.avg == null) || (a.st.avg || 0) - (b.st.avg || 0));
+    const badge = extra.newBest ? '<span class="rec">新紀錄！最快一拍</span>' : extra.newAvg ? '<span class="rec">新紀錄！平均最快</span>' : '';
+    return '<div class="speed-box"><h3>拍速' + badge + '</h3>' +
+      '<table class="speed-table compact"><thead><tr><th scope="col">玩家</th><th scope="col">平均（秒）</th><th scope="col">最快（秒）</th><th scope="col">對</th><th scope="col">錯</th></tr></thead><tbody>' +
+      rows.map(r => '<tr class="' + (r.i === me ? 'me' : '') + '"><th scope="row"><span class="mini">' + Art.animalSvg(r.s.char || 'otter') + '</span>' +
+        esc(r.s.name) + (r.i === me ? '（你）' : '') + '</th>' +
+        '<td>' + num(r.st.avg) + '</td><td>' + num(r.st.best) + '</td><td>' + r.st.hits + '</td><td>' + r.st.wrong + '</td></tr>').join('') +
+      '</tbody></table></div>';
+  }
+
+  root.Table = { create, resultHtml, sec, SEAT_COLORS, DIFF_NAME };
 })(typeof self !== 'undefined' ? self : this);

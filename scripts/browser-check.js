@@ -114,6 +114,20 @@ async function solo(browser, base) {
   await page.evaluate(() => Solo.stop());
   await page.goto(base);
 
+  /* 單機：每個電腦各自的難度 */
+  await page.click('#go-solo');
+  while (await page.isEnabled('#solo-ai [data-step="1"]')) await page.click('#solo-ai [data-step="1"]');
+  await page.click('#solo-diff [data-diff="normal"]');
+  await page.click('#solo-ai-list [data-ai="0"][data-diff="kid"]');
+  await page.click('#solo-ai-list [data-ai="2"][data-diff="hard"]');
+  ok(!(await page.$('#solo-diff [aria-checked="true"]')) && /混合難度/.test(await page.textContent('#solo-diff-hint')), '電腦難度不一樣時顯示「混合難度」');
+  await page.screenshot({ path: path.join(OUT, '平板橫向-單機設定-混合難度.png') });
+  await page.click('#solo-start');
+  const mix = await page.evaluate(() => ({ ai: Solo._debug.state.seats.filter(s => s.ai).map(s => s.id + ':' + s.ai).sort().join(','), flip: Solo._debug.state.pace.flipMs, kind: Solo._debug.cfg.kind }));
+  ok(mix.ai === 'ai0:kid,ai1:normal,ai2:hard', '每個電腦照各自選的難度（' + mix.ai + '）');
+  ok(mix.flip === 1700 && mix.kind === 'mixed', '混合難度時翻牌節奏跟著最簡單的電腦（幼幼班）');
+  await page.evaluate(() => Solo.stop());
+  await page.goto(base);
   await page.click('#go-help');
   ok((await page.textContent('#help-body')).includes('最慢的人收牌'), '說明頁有完整的文字教學');
   await page.click('#help-go');
@@ -129,12 +143,34 @@ async function solo(browser, base) {
   await page.waitForSelector('#result:not([hidden])', { timeout: 15000 });
   ok(await page.isVisible('#result'), '單機一局可以從開始打到結算');
   await page.screenshot({ path: path.join(OUT, '平板橫向-結算.png') });
+  ok(await page.isVisible('#result .speed-table') && (await page.$$('#result .speed-table tbody tr')).length === 4, '結算列出每個人的拍速');
+  ok(await page.evaluate(() => JSON.parse(localStorage.getItem('heart-attack')).reaction.games === 1), '這局的拍速記到這台裝置');
   await page.click('#res-again');
   ok(await page.isHidden('#result') && await page.evaluate(() => Solo._debug.state.seats.reduce((a, s) => a + s.hand.length, 0) === 52), '「再來一局」重新發 52 張');
   await page.keyboard.press('Escape');
   ok(await page.isVisible('#menu-modal'), 'Esc 打開暫停選單');
   await page.click('#m-home');
   ok(await page.isVisible('#screen-home'), '暫停選單可以回首頁');
+
+  /* 我的拍速頁：放一些紀錄進去，看圖表、表格、提示、清除 */
+  await page.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem('heart-attack'));
+    const h = [620, 540, 580, 470, 430].map((avg, i) => ({ d: '2026-09-2' + i, kind: i % 2 ? 'hard' : 'online', avg, best: avg - 120, hits: 6, wrong: 1, missed: 1 }));
+    d.reaction = { best: 310, hits: 30, sum: 30 * 528, wrong: 5, missed: 5, games: 5, byKind: { hard: { best: 310, hits: 12, sum: 12 * 505, bestAvg: 470 }, online: { best: 350, hits: 18, sum: 18 * 543, bestAvg: 430 } }, history: h };
+    localStorage.setItem('heart-attack', JSON.stringify(d));
+  });
+  await page.reload();
+  await page.click('#go-speed');
+  ok(await page.isVisible('#screen-speed') && (await page.textContent('.speed-hero')).includes('0.31'), '我的拍速：顯示最快一拍 0.31 秒');
+  ok((await page.$$('.speed-chart .bar')).length === 5, '最近 5 局的平均畫成 5 根長條');
+  await page.locator('.speed-chart .bar').last().click({ force: true });
+  ok(/平均 0\.43 秒/.test(await page.textContent('.chart-tip')), '點長條顯示那一局的數值');
+  ok((await page.textContent('#speed-body')).includes('困難') && (await page.textContent('#speed-body')).includes('線上'), '各難度表格有困難與線上');
+  await page.screenshot({ path: path.join(OUT, '平板橫向-我的拍速.png'), fullPage: true });
+  await page.click('#speed-clear');
+  await page.click('#speed-clear');
+  ok(await page.isVisible('.speed-empty'), '清除（按兩次確認）後回到空白狀態');
+  await page.click('#screen-speed [data-back="home"]');
 
   /* 結束方式：打到只剩一人有牌 —— 自己先出完，看離場畫面，再等其他人打完 */
   await page.click('#go-solo');
@@ -198,8 +234,11 @@ async function online(browser, base) {
   await A.waitForSelector('#screen-room:not([hidden])');
   ok(true, '建立房間進入等待室');
   await A.click('[data-act="add-ai"]');
-  await A.waitForFunction(() => document.querySelectorAll('.seat-row .tag.ai').length === 1);
+  await A.waitForSelector('.seat-row select[data-ai-diff]');
   ok(true, '房主可以加電腦');
+  await A.selectOption('.seat-row select[data-ai-diff]', 'kid');
+  await A.waitForFunction(() => Online.room.seats.some(s => s.kind === 'ai' && s.diff === 'kid'));
+  ok(true, '房主可以替這個電腦選難度（幼幼班）');
   const link = await A.inputValue('#invite-url');
   ok(/invite=/.test(link), '有邀請連結可以複製');
   await A.screenshot({ path: path.join(OUT, '線上-桌機-等待室.png') });
@@ -217,6 +256,7 @@ async function online(browser, base) {
   await C.click('.invite-card button[data-as="spectator"]');
   await C.waitForSelector('#screen-room:not([hidden])');
   ok((await C.textContent('#room-role')).includes('觀戰'), '用同一個連結選觀戰 → 觀戰者');
+  ok((await C.textContent('#room-seats')).includes('電腦・幼幼班') && !(await C.$('#room-seats select')), '其他人看得到電腦難度但不能改');
 
   await B.click('[data-act="ready"]');
   await A.waitForSelector('[data-act="start"]:not([disabled])');

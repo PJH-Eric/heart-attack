@@ -28,6 +28,7 @@
           <button class="btn3d btn-big sea" id="go-online" type="button">跟別人玩<small>線上房間、觀戰、邀請</small></button>
           <button class="btn3d btn-big sand" id="go-help" type="button">怎麼玩<small>一分鐘看懂規則</small></button>
         </div>
+        <button class="btn3d sand small speed-link" id="go-speed" type="button">我的拍速</button>
         <p class="home-stats" id="home-stats"></p>
       </div>
     </section>
@@ -57,7 +58,9 @@
         </div>
         <div class="field">
           <span>電腦難度</span>
-          <div class="seg" id="solo-diff" role="radiogroup" aria-label="電腦難度"></div>
+          <div class="diff-all"><small>全部一起設</small>
+            <div class="seg small" id="solo-diff" role="radiogroup" aria-label="所有電腦的難度"></div></div>
+          <ul class="ai-diff-list" id="solo-ai-list" aria-label="每個電腦各自的難度"></ul>
           <small class="hint" id="solo-diff-hint"></small>
         </div>
         <div class="field">
@@ -79,6 +82,15 @@
         <h2>怎麼玩</h2>
       </header>
       <div class="panel-card help" id="help-body"></div>
+    </section>
+
+    <!-- ========== 我的拍速 ========== -->
+    <section id="screen-speed" class="screen" data-screen="speed" hidden>
+      <header class="topbar">
+        <button class="icon-btn back-btn" type="button" data-back="home" aria-label="回首頁"></button>
+        <h2>我的拍速</h2>
+      </header>
+      <div class="speed-page" id="speed-body"></div>
     </section>
 
     <!-- ========== 線上大廳 ========== -->

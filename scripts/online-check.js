@@ -129,6 +129,7 @@ async function liveTest() {
   ok(game.seats.length === 3 && game.seats.reduce((a, s) => a + s.count, 0) === 52, '3 人共 52 張');
   ok(!JSON.stringify(host.room).includes('"hand"') && !JSON.stringify(host.room).includes('seed'), '送到瀏覽器的資料沒有手牌內容與 seed');
   ok(spec.room.game && spec.room.you.role === 'spectator', '觀戰者也看到牌桌');
+  ok(Array.isArray(game.stats) && game.stats.length === 3 && 'avg' in game.stats[0], '牌桌資料帶每個人的拍速統計');
 
   /* 對局中想加入 → 觀戰 */
   const mid = await client(port, 'key-mid-333', '中途', 'shiba');
@@ -196,9 +197,15 @@ function hubTest() {
   hub.join(b, room.id, 'player');
   ok(hub.addAI(a, 'hard').ok && hub.addAI(a, 'kid').ok, '房主可以加電腦補位（可指定難度）');
   ok(!hub.addAI(a).ok, '座位滿了不能再加電腦');
+  const kidAI = room.seats.find(s => s.kind === 'ai' && s.diff === 'kid');
+  ok(!hub.setAIDiff(b, kidAI.id, 'hard').ok, '只有房主能改電腦難度');
+  ok(hub.setAIDiff(a, kidAI.id, 'easy').ok && kidAI.diff === 'easy', '房主可以替單一電腦換難度');
+  ok(room.seats.filter(s => s.kind === 'ai').map(s => s.diff).join(',') === 'hard,easy', '每個電腦的難度各自不同');
+  ok(!hub.setAIDiff(a, kidAI.id, 'super').ok, '不存在的難度會被拒絕');
   hub.setReady(b, true);
   ok(hub.startGame(a).ok, '2 真人＋2 電腦開局');
   const st = room.game.state;
+  ok(st.seats.filter(x => x.ai).map(x => x.ai).sort().join(',') === 'easy,hard', '開局後每個電腦照各自的難度出手');
   ok(st.autoStartMs === hub.CONST.AUTO_START_MS, '線上有啟動者逾時代按');
 
   /* b 斷線超過保留時間 → 電腦代打 */
@@ -211,6 +218,7 @@ function hubTest() {
     if (!taken && st.seats.find(s => s.id === b.id).ai === 'normal') taken = true;
   }
   ok(taken, '斷線超過 30 秒 → 電腦代打，對局不會卡住');
+  ok(room.lastGame.stats.length === room.lastGame.seats.length && room.lastGame.stats.every(x => 'hits' in x && 'avg' in x && 'best' in x), '結算資料有每個人的拍速統計');
   ok(!room.game && room.lastGame && room.lastGame.phase === 'over', '整局打完（真人不動也會因代按與代打而結束）');
   ok(room.lastGame.seats.some(s => s.count === 0), '有人出完牌獲勝');
   ok(room.seats.filter(s => s.kind === 'human').every(s => !s.ready), '結束後大家要重新按準備');

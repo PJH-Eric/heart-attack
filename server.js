@@ -182,6 +182,7 @@ function createServer(opt) {
       case 'settings': reply(hub.settings(p, msg)); break;
       case 'addAI': reply(hub.addAI(p, msg.diff)); break;
       case 'removeAI': reply(hub.removeAI(p, msg.id)); break;
+      case 'aiDiff': reply(hub.setAIDiff(p, msg.id, msg.diff)); break;
       case 'kick': {
         const r = hub.kick(p, msg.personId);
         reply(r);
@@ -197,7 +198,7 @@ function createServer(opt) {
       case 'start': reply(hub.startGame(p)); break;
       case 'deal': reply(hub.gameStart(p)); break;
       case 'slap': {
-        const r = hub.gameSlap(p, msg.revealId, msg.actionId);
+        const r = hub.gameSlap(p, msg.revealId, msg.actionId, msg.rt);
         if (!r.ok && r.code && r.code !== 'dup') send(p.id, { type: 'slapRejected', code: r.code });
         break;
       }

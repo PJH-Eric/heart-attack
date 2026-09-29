@@ -49,6 +49,10 @@
       else root.Net.send({ type: 'join', roomId: b.dataset.join, as: b.dataset.as });
     });
     $('#screen-room').addEventListener('click', onRoomClick);
+    $('#screen-room').addEventListener('change', e => {
+      const sel = e.target.closest('[data-ai-diff]');
+      if (sel) root.Net.send({ type: 'aiDiff', id: sel.dataset.aiDiff, diff: sel.value });
+    });
     $('#lobby-name').addEventListener('change', saveProfile);
   }
 
@@ -212,7 +216,12 @@
       const isMe = s.id === me.id;
       const tags = [];
       if (s.id === room.hostId) tags.push('<i class="tag host">房主</i>');
-      if (s.kind === 'ai') tags.push('<i class="tag ai">電腦・' + DIFF_NAME[s.diff] + '</i>');
+      if (s.kind === 'ai' && me.host) {
+        /* 房主可以替每個電腦各自選難度 */
+        tags.push('<label class="ai-diff-pick"><span class="sr-only">' + esc(s.name) + ' 的難度</span><select data-ai-diff="' + s.id + '">' +
+          Object.keys(DIFF_NAME).map(k => '<option value="' + k + '"' + (k === s.diff ? ' selected' : '') + '>' + DIFF_NAME[k] + '</option>').join('') +
+          '</select></label>');
+      } else if (s.kind === 'ai') tags.push('<i class="tag ai">電腦・' + DIFF_NAME[s.diff] + '</i>');
       else if (!s.online) tags.push('<i class="tag off">離線</i>');
       else if (s.id === room.hostId) tags.push('<i class="tag ready">開局者</i>');
       else tags.push(s.ready ? '<i class="tag ready">準備好了</i>' : '<i class="tag wait">還沒準備</i>');
@@ -259,7 +268,7 @@
         '<div class="set-line"><span>人數上限</span>' + seg('max', [[2, '2 人'], [3, '3 人'], [4, '4 人']], room.max) + '</div>' +
         '<div class="set-line"><span>翻牌節奏</span>' + seg('pace', [['slow', '悠閒'], ['normal', '普通'], ['fast', '緊張']], room.pace) + '</div>' +
         '<div class="set-line"><span>結束方式</span>' + seg('endMode', [['first', '有人出完就結束'], ['last', '打到只剩一人']], room.endMode) + '</div>' +
-        '<div class="set-line"><span>電腦難度</span>' + seg('aiDiff', Object.keys(DIFF_NAME).map(k => [k, DIFF_NAME[k]]), room.aiDiff) + '</div>'
+        '<div class="set-line"><span>新電腦預設</span>' + seg('aiDiff', Object.keys(DIFF_NAME).map(k => [k, DIFF_NAME[k]]), room.aiDiff) + '</div>'
       : '<p class="host-info">人數上限 ' + room.max + ' 人・節奏' + PACE_NAME[room.pace] + '・' + (END_NAME[room.endMode] || END_NAME.first) + '（房主決定）</p>';
 
     /* 邀請連結 */
@@ -342,8 +351,8 @@
         myId: room.you.role === 'player' ? room.you.id : null,
         online: true,
         settings: () => root.App.store,
-        onSlap: revealId => {
-          const ok = root.Net.send({ type: 'slap', revealId, actionId: Math.random().toString(36).slice(2, 10) });
+        onSlap: (revealId, rt) => {
+          const ok = root.Net.send({ type: 'slap', revealId, rt, actionId: Math.random().toString(36).slice(2, 10) });
           if (!ok) toast('連線中斷，這次拍牌沒有送出去', 'bad');
         },
         onStart: () => root.Net.send({ type: 'deal' })
@@ -359,12 +368,14 @@
     const v = room.lastGame;
     const myId = room.you.id;
     const mine = v.seats.findIndex(s => s.id === myId);
+    let rec = null;
     if (mine >= 0) {
       root.Store.record(root.App.store, 'online', mine === v.winner);
+      if (v.stats) rec = root.Store.recordReaction(root.App.store, 'online', v.stats[mine]);
       root.Sound.sfx(mine === v.winner ? 'win' : 'lose');
     } else root.Sound.sfx('win');
     const box = $('#result');
-    box.innerHTML = root.Table.resultHtml(v, myId, '這局一共翻了 ' + v.flips + ' 張牌');
+    box.innerHTML = root.Table.resultHtml(v, myId, '這局一共翻了 ' + v.flips + ' 張牌', rec);
     $('#result-actions').innerHTML =
       '<button type="button" class="btn3d coral" id="res-room">回到房間</button>' +
       '<button type="button" class="btn3d sand" id="res-leave">離開房間</button>';
