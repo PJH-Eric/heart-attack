@@ -57,11 +57,11 @@ async function liveTest() {
   const spec = await client(port, 'key-spec-890', '路人', 'cat');
   ok(host.me && host.me.name === '房主', 'hello 後拿到身分');
 
-  host.send({ type: 'create', max: 3, pace: 'fast' });
+  host.send({ type: 'create', max: 3, pace: 'fast' });   /* max 會被忽略，固定 4 人 */
   await host.wait(c => c.room);
   const rid = host.room.id;
   ok(host.room.you.host && host.room.you.role === 'player', '建房者是房主也是玩家');
-  ok(host.room.max === 3 && host.room.pace === 'fast', '建房設定生效');
+  ok(host.room.max === 4 && host.room.pace === 'fast', '建房設定生效（人數固定 4 人）');
   ok(await bob.wait(c => c.lobby.some(r => r.id === rid)), '大廳列表看得到新房間');
 
   const tok = host.room.invite.token;
@@ -77,7 +77,7 @@ async function liveTest() {
   ok(spec.room.you.role === 'spectator', '選觀戰 → 觀戰者');
 
   /* 權限 */
-  spec.send({ type: 'settings', max: 2 });
+  spec.send({ type: 'settings', pace: 'slow' });
   await spec.wait(c => c.errors.length);
   ok(spec.errors.some(e => /房主/.test(e.text)), '非房主不能改設定');
   bob.send({ type: 'start' });
@@ -100,10 +100,15 @@ async function liveTest() {
   late.send({ type: 'join', invite: host.room.invite.token, as: 'player' });
   await late.wait(c => c.room && c.room.id === rid);
   ok(late.room.you.role === 'player', '新連結可以加入（第 3 個座位）');
+  /* 第 4 個座位先用電腦佔住，測完「座位滿了」再移除，後面照 3 人打 */
+  host.send({ type: 'addAI' });
+  await host.wait(c => c.room && c.room.seats.length === 4);
   const late2 = await client(port, 'key-late-222', '又一個', 'penguin');
   late2.send({ type: 'join', roomId: rid, as: 'player' });
   await late2.wait(c => c.room && c.room.id === rid);
   ok(late2.room.you.role === 'spectator' && late2.msgs.some(m => m.type === 'notice'), '座位滿了想上桌 → 轉觀戰並提示');
+  host.send({ type: 'removeAI', id: host.room.seats.find(s => s.kind === 'ai').id });
+  await host.wait(c => c.room && c.room.seats.length === 3);
 
   /* 聊天：觀戰者也能聊 */
   spec.send({ type: 'chat', text: '加油！' });

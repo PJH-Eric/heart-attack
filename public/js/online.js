@@ -39,7 +39,7 @@
     root.Net.on('replaced', () => toast('你在別的分頁開了同一個身分，這個分頁先斷線', 'bad'));
 
     $('#lobby-quick').onclick = () => { saveProfile(); root.Net.send({ type: 'quick' }); };
-    $('#lobby-create').onclick = () => { saveProfile(); root.Net.send({ type: 'create', max: 4, pace: 'normal' }); };
+    $('#lobby-create').onclick = () => { saveProfile(); root.Net.send({ type: 'create', pace: 'normal' }); };
     $('#room-leave').onclick = () => leaveRoom();
     $('#room-list').addEventListener('click', e => {
       const b = e.target.closest('[data-join]');
@@ -267,11 +267,9 @@
       '<button type="button" role="radio" aria-checked="' + (String(o[0]) === String(cur)) + '" data-set="' + k + '" data-val="' + o[0] + '">' + o[1] + '</button>').join('') + '</div>';
     $('#room-host').innerHTML = me.host
       ? '<h4>房間設定（房主）</h4>' +
-        '<div class="set-line"><span>人數上限</span>' + seg('max', [[2, '2 人'], [3, '3 人'], [4, '4 人']], room.max) + '</div>' +
         '<div class="set-line"><span>翻牌節奏</span>' + seg('pace', [['slow', '悠閒'], ['normal', '普通'], ['fast', '緊張']], room.pace) + '</div>' +
-        '<div class="set-line"><span>結束方式</span>' + seg('endMode', [['first', '有人出完就結束'], ['last', '打到只剩一人']], room.endMode) + '</div>' +
-        '<div class="set-line"><span>新電腦預設</span>' + seg('aiDiff', Object.keys(DIFF_NAME).map(k => [k, DIFF_NAME[k]]), room.aiDiff) + '</div>'
-      : '<p class="host-info">人數上限 ' + room.max + ' 人・節奏' + PACE_NAME[room.pace] + '・' + (END_NAME[room.endMode] || END_NAME.first) + '（房主決定）</p>';
+        '<div class="set-line"><span>結束方式</span>' + seg('endMode', [['first', '有人出完就結束'], ['last', '打到只剩一人']], room.endMode) + '</div>'
+      : '<p class="host-info">節奏' + PACE_NAME[room.pace] + '・' + (END_NAME[room.endMode] || END_NAME.first) + '（房主決定）</p>';
 
     /* 邀請連結 */
     const link = room.invite.active ? inviteLink(room.invite.token) : '';
@@ -306,8 +304,7 @@
     if (!b || !S.room) return;
     const act = b.dataset.act;
     if (b.dataset.set) {
-      const v = b.dataset.set === 'max' ? Number(b.dataset.val) : b.dataset.val;
-      root.Net.send({ type: 'settings', [b.dataset.set]: v });
+      root.Net.send({ type: 'settings', [b.dataset.set]: b.dataset.val });
       return;
     }
     const mySeat = S.room.seats.find(s => s.id === S.room.you.id);
