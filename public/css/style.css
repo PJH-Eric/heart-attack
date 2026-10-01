@@ -498,6 +498,7 @@ body.online-game .me-area { padding-left: calc(62px + var(--safe-l)); }
 .pile-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: none; }
 .pile::before { content: ""; position: absolute; left: 50%; top: 50%; width: var(--card); height: calc(var(--card) * 1.4); transform: translate(-50%, -50%); border: 4px dashed rgba(255,255,255,.55); border-radius: 14px; }
 .pile { position: relative; width: calc(var(--card) * 1.25); height: calc(var(--card) * 1.5); touch-action: manipulation; cursor: pointer; }
+@media (hover: none) { .pile { cursor: default; } }
 .pc { position: absolute; left: 50%; top: 50%; width: var(--card); transform: translate(-50%, -50%) rotate(var(--r, 0deg)); filter: drop-shadow(0 4px 4px rgba(0,40,50,.3)); }
 .pc svg { width: 100%; height: auto; display: block; }
 .pc.under { filter: drop-shadow(0 2px 2px rgba(0,40,50,.3)) brightness(.95); }
