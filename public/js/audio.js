@@ -122,7 +122,7 @@
   const SAY = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二', '十三'];
   const clipBuf = {};
   let clipsLoading = false;
-  let voice = null;
+  let voice = null, lastUtter = null;
   const synth = root.speechSynthesis || null;
 
   function pickVoice() {
@@ -181,10 +181,33 @@
       u.rate = 1.3;
       u.pitch = 1.25;
       u.volume = Math.min(1, settings.sfxVol + 0.3);
-      u.onerror = e => { if (e && e.error !== 'interrupted' && e.error !== 'canceled') playClip(rank); };
+      let started = false, fellBack = false;
+      const fallback = () => { if (!started && !fellBack) { fellBack = true; playClip(rank); } };
+      u.onstart = () => { started = true; };
+      u.onerror = e => { if (e && e.error !== 'interrupted' && e.error !== 'canceled') fallback(); };
+      lastUtter = u;
       synth.speak(u);
+      /* 語音引擎閒置後第一句常常慢半拍才開口，下一張翻牌時又被 cancel 掉（開局的「一」就這樣沒聲音）；
+         一小段時間內還沒開口就取消，改播內建錄音 */
+      setTimeout(() => { if (!started && lastUtter === u) { synth.cancel(); fallback(); } }, 450);
       return true;
     } catch (e) { return false; }
+  }
+
+  /** 開局（按下開始）時先無聲念一句，把閒置的語音引擎叫醒，「一」才能準時念出來 */
+  function warmVoice() {
+    if (!settings.voice || !settings.sfx || voiceSource() !== 'device') return;
+    if (!synth || !root.SpeechSynthesisUtterance || synth.speaking || synth.pending) return;
+    voice = voice || pickVoice();
+    try {
+      synth.resume();
+      const u = new root.SpeechSynthesisUtterance(SAY[0]);
+      u.lang = voice ? voice.lang : 'zh-TW';
+      if (voice) u.voice = voice;
+      u.rate = 2;
+      u.volume = 0;
+      synth.speak(u);
+    } catch (e) { /* 忽略 */ }
   }
 
   function voiceSource() {
@@ -219,7 +242,7 @@
   }
 
   root.Sound = {
-    unlock, apply, sfx, call, previewVoice, stopMusic,
+    unlock, apply, sfx, call, warmVoice, previewVoice, stopMusic,
     get settings() { return settings; },
     get hasDeviceVoice() { return !!voice; },
     get voiceSource() { return voiceSource(); },
