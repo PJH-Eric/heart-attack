@@ -90,7 +90,8 @@
         slapBtn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); trySlap(); } });
       }
       const pile = $('.pile', board);
-      pile.addEventListener('pointerdown', e => { if (mySeat >= 0) { e.preventDefault(); trySlap(); } });
+      /* 點牌堆拍牌只給滑鼠用；手機、平板摸到牌桌很容易誤觸，觸控一律用拍牌鈕 */
+      pile.addEventListener('pointerdown', e => { if (mySeat >= 0 && e.pointerType === 'mouse') { e.preventDefault(); trySlap(); } });
       $('.start-btn', board).addEventListener('click', () => opt.onStart());
     }
 
@@ -199,6 +200,7 @@
         hideBanner();
         clearMarks();
         root.Sound.sfx('start');
+        root.Sound.warmVoice();
         addLog((e.auto ? '時間到，系統幫 ' + name(e.seat) + ' ' : name(e.seat) + ' ') + (e.segment === 1 ? '按下開始' : '按下自動發牌') + '，從 1 喊起');
       } else if (e.type === 'out') {
         const txt = name(e.seat) + ' 出完了！第 ' + e.place + ' 名';
