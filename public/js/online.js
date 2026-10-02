@@ -358,12 +358,14 @@
       });
       S.tableRoomId = room.id;
     }
+    if (root.NetworkLatency) root.NetworkLatency.setActive(true);
     const seatInfo = {};
     room.seats.forEach(s => { if (s.kind === 'human') seatInfo[s.id] = { offline: !s.online, takeover: s.takeover || s.left }; });
     S.table.render(room.game, { seatInfo });
   }
 
   function showResult(room) {
+    if (root.NetworkLatency) root.NetworkLatency.setActive(false);
     const v = room.lastGame;
     const myId = room.you.id;
     const mine = v.seats.findIndex(s => s.id === myId);
@@ -385,6 +387,7 @@
   }
 
   function endTable() {
+    if (root.NetworkLatency) root.NetworkLatency.setActive(false);
     if (S.table) { S.table.destroy(); S.table = null; S.tableRoomId = null; }
   }
 
