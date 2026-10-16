@@ -96,12 +96,23 @@ button:disabled { cursor: not-allowed; }
 .icon-btn.small { width: 44px; height: 44px; border-radius: 12px; }
 .icon-btn.small svg { width: 20px; height: 20px; }
 .gear-btn { position: fixed; z-index: 60; top: calc(10px + var(--safe-t)); right: calc(12px + var(--safe-r)); }
+/* 語言切換鈕：固定在設定鈕左邊，跟設定鈕同風格同尺寸（顯示「EN」或「中」） */
+.lang-toggle {
+  position: fixed; z-index: 60; top: calc(10px + var(--safe-t)); right: calc(72px + var(--safe-r));
+  width: 52px; height: 52px; display: inline-grid; place-items: center; padding: 0;
+  border: 3px solid var(--wood-dark); border-radius: 16px;
+  background: linear-gradient(180deg, #E8B97F, #B98048);
+  color: #FFF6E6; font-size: 1.05rem; font-weight: 900; letter-spacing: .02em; line-height: 1;
+  box-shadow: 0 4px 0 var(--wood-dark), inset 0 2px 0 rgba(255,255,255,.35);
+  touch-action: manipulation; cursor: pointer;
+}
+.lang-toggle:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--wood-dark); }
 
 .link-btn { background: none; border: 0; color: var(--sea-dark); font-weight: 800; text-decoration: underline; min-height: 44px; padding: 0 .5em; font-size: .95rem; }
 .link-btn.danger { color: var(--bad); }
 
 /* ---------- 共用卡片 ---------- */
-.topbar { display: flex; align-items: center; gap: 12px; padding-right: 70px; margin-bottom: 14px; }
+.topbar { display: flex; align-items: center; gap: 12px; padding-right: 132px; margin-bottom: 14px; }
 .topbar h2 { margin: 0; font-size: 1.5rem; color: #fff; text-shadow: 0 2px 0 rgba(0,60,80,.35), 0 0 12px rgba(0,60,80,.2); outline: none; }
 .panel-card {
   background: var(--paper);
@@ -842,3 +853,8 @@ html { background: #E3BC7E; }
 .dd-opt-text small { font-size: .78rem; font-weight: 700; color: var(--ink-soft); }
 .dd-check { width: 20px; height: 20px; flex: none; }
 .dd-pop .dd-pips i { width: 8px; height: 8px; }
+
+/* Character names may be longer in English. */
+.char-grid, .setup-me .char-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.char-opt { min-width: 0; overflow-wrap: anywhere; }
+@media(max-width: 360px) { .char-grid, .setup-me .char-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

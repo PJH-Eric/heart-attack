@@ -5,6 +5,7 @@
   'use strict';
 
   const { $ } = root.UI;
+  const T = (k, p) => root.I18N.t(k, p);
   let game = null;
 
   function start(cfg) {
@@ -96,19 +97,28 @@
     root.Store.record(root.App.store, game.cfg.kind, win);
     root.Sound.sfx(win ? 'win' : 'lose');
     const st = root.App.store.stats[game.cfg.kind] || { play: 0, win: 0 };
-    const diffName = game.cfg.kind === 'mixed' ? '混合難度' : root.Rules.DIFFICULTIES[game.cfg.kind].name;
     const box = $('#result');
     const me = v.seats.findIndex(s => s.id === 'me');
     const rec = root.Store.recordReaction(root.App.store, game.cfg.kind, v.stats[me]);
-    box.innerHTML = root.Table.resultHtml(v, 'me',
-      '這局一共翻了 ' + v.flips + ' 張牌｜' + diffName + '：玩了 ' + st.play + ' 局、贏 ' + st.win + ' 局', rec);
-    $('#result-actions').innerHTML =
-      '<button type="button" class="btn3d coral" id="res-again">再來一局</button>' +
-      '<button type="button" class="btn3d sand" id="res-home">回首頁</button>';
+    game.result = { v, rec };
+    paintResult();
     box.hidden = false;
+    $('#res-again').focus({ preventScroll: true });
+  }
+
+  /** 畫結算卡（換語言時可重畫，不會重複記錄戰績） */
+  function paintResult() {
+    if (!game || !game.result) return;
+    const v = game.result.v, rec = game.result.rec;
+    const st = root.App.store.stats[game.cfg.kind] || { play: 0, win: 0 };
+    const diffName = game.cfg.kind === 'mixed' ? T('kind.mixed') : T('diff.' + game.cfg.kind);
+    const box = $('#result');
+    box.innerHTML = root.Table.resultHtml(v, 'me', T('result.soloStats', { flips: v.flips, diff: diffName, play: st.play, win: st.win }), rec);
+    $('#result-actions').innerHTML =
+      '<button type="button" class="btn3d coral" id="res-again">' + T('result.again') + '</button>' +
+      '<button type="button" class="btn3d sand" id="res-home">' + T('nav.homeShort') + '</button>';
     $('#res-again').onclick = () => { box.hidden = true; start(game.cfg); };
     $('#res-home').onclick = () => { box.hidden = true; stop(); root.UI.show('home'); };
-    $('#res-again').focus({ preventScroll: true });
   }
 
   /** silent：只停時鐘不開選單（例如打開設定彈窗時） */
@@ -137,6 +147,16 @@
     get paused() { return !!(game && game.paused); },
     restart() { if (game) { const c = game.cfg; start(c); } },
     redraw() { if (game) { game.table.redrawCards(); draw(); } },
+    relabel() {
+      if (!game) return;
+      game.table.relabel();
+      const box = $('#result');
+      if (game.result && !box.hidden) {
+        const hadFocus = box.contains(document.activeElement);
+        paintResult();
+        if (hadFocus) $('#res-again').focus({ preventScroll: true });
+      }
+    },
     /* 給自動化版面測試用：直接拿到規則狀態 */
     get _debug() { return game; }
   };

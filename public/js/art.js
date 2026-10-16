@@ -43,6 +43,11 @@
 
   const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
   const SUIT_ZH = { S: '黑桃', H: '紅心', D: '方塊', C: '梅花' };
+  const tr = (k, p) => (root.I18N ? root.I18N.t(k, p) : k);
+  /** 花色名稱（跟著目前語言） */
+  function suitName(s) { return tr('suit.' + s); }
+  /** 動物名稱（跟著目前語言） */
+  function animalName(id) { return tr('animal.' + id); }
 
   /* 2～10 的點子位置（牌面 250×350，中間區 x 80～170、y 88～262） */
   const L = 88, C = 125, R = 162;
@@ -105,7 +110,7 @@
     }
 
     return '<svg viewBox="0 0 250 350" class="card-svg ' + (opt.cls || '') + '" role="img" aria-label="' +
-      SUIT_ZH[card.s] + ' ' + rank + '">' +
+      suitName(card.s) + ' ' + rank + '">' +
       '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0.3" y2="1">' +
       '<stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F3EEE4"/></linearGradient></defs>' +
       '<rect x="3" y="3" width="244" height="344" rx="22" fill="url(#' + gid + ')" stroke="#CFC6B6" stroke-width="3"/>' +
@@ -244,7 +249,7 @@
       face = face.replace(/<path d="M5[34] [^"]*"[^>]*\/>/, '') +
         '<ellipse cx="60" cy="80" rx="5" ry="6.5" fill="#2A2230"/>';
     }
-    return '<svg viewBox="0 0 120 120" class="animal ' + (opt.cls || '') + '" role="img" aria-label="' + a.name + '">' +
+    return '<svg viewBox="0 0 120 120" class="animal ' + (opt.cls || '') + '" role="img" aria-label="' + animalName(a.id) + '">' +
       '<defs><radialGradient id="' + g + '" cx="0.38" cy="0.32" r="0.8">' +
       '<stop offset="0" stop-color="' + a.light + '" stop-opacity=".55"/><stop offset=".45" stop-color="' + a.base + '"/>' +
       '<stop offset="1" stop-color="' + a.dark + '"/></radialGradient>' +
@@ -321,7 +326,7 @@
 
   /** 首頁主視覺：海島牌桌、三隻動物與一張翻開的 7 */
   function heroSvg() {
-    return '<svg viewBox="0 0 360 220" class="hero-svg" aria-label="海島牌桌上，水獺、兔兔和企鵝正準備拍牌">' +
+    return '<svg viewBox="0 0 360 220" class="hero-svg" aria-label="' + tr('art.hero') + '">' +
       '<ellipse cx="180" cy="176" rx="160" ry="40" fill="#4CC3C8" stroke="#B9824D" stroke-width="10"/>' +
       '<ellipse cx="180" cy="172" rx="132" ry="26" fill="#7FDCD8" opacity=".7"/>' +
       nest(animalSvg('otter'), 14, 58, 108, 108) +
@@ -333,7 +338,7 @@
   }
 
   root.Art = {
-    ANIMALS, ANIMAL_MAP, RANKS, SUIT_ZH,
+    ANIMALS, ANIMAL_MAP, RANKS, SUIT_ZH, suitName, animalName,
     cardSvg, cardBackSvg, suitIcon, nest, suitColor, animalSvg, handIcon, stackIcon, icon, heroSvg, hibiscus
   };
 })(typeof self !== 'undefined' ? self : this);

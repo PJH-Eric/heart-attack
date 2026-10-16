@@ -5,7 +5,7 @@
  *
  * - 瀏覽器規定要等使用者第一次點擊才能出聲 → unlock() 綁在第一次點擊。
  * - 背景音樂與音效分開開關、分開音量，設定立即生效。
- * - 喊數語音：內建錄音（voice-clips.js）或裝置的中文語音，可在設定切換或關掉。
+ * - 喊數語音：內建錄音（中文 voice-clips.js、英文 voice-clips-en.js）或裝置語音，跟著介面語言切換，可在設定切換或關掉。
  */
 (function (root) {
   'use strict';
@@ -115,19 +115,28 @@
   /* ---------- 喊數語音 ----------
    * 兩種來源：
    *   clip   —— 內建錄音（voice-clips.js），跟翻牌同一瞬間播出，每台裝置都一樣
-   *   device —— 瀏覽器／系統的中文語音，比較自然，但有的裝置沒有中文語音、或會慢半拍
-   *   auto   —— 裝置有中文語音就用裝置語音，沒有就用內建錄音（預設）
+   *   device —— 瀏覽器／系統的語音（依介面語言：中文念「一、二……」，英文念 one、two……），比較自然，但有的裝置沒有該語言的語音、或會慢半拍
+   *   auto   —— 裝置有該語言的語音就用裝置語音，沒有就用內建錄音（預設）
    */
 
-  const SAY = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二', '十三'];
-  const clipBuf = {};
-  let clipsLoading = false;
+  const SAY_ZH = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二', '十三'];
+  const SAY_EN = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen'];
+  /** 目前要喊的語言：'en' 或 'zh' */
+  const vlang = () => (root.I18N && root.I18N.lang === 'en' ? 'en' : 'zh');
+  const sayText = rank => (vlang() === 'en' ? SAY_EN : SAY_ZH)[rank - 1];
+  const clipBuf = { zh: {}, en: {} };
+  const clipsLoading = { zh: false, en: false };
   let voice = null, lastUtter = null;
   const synth = root.speechSynthesis || null;
 
   function pickVoice() {
     if (!synth) return null;
     const list = synth.getVoices() || [];
+    if (vlang() === 'en') {
+      return list.find(v => /^en[-_]US/i.test(v.lang)) ||
+        list.find(v => /^en[-_](GB|AU|CA)/i.test(v.lang)) ||
+        list.find(v => /^en/i.test(v.lang)) || null;
+    }
     return list.find(v => /zh[-_]TW/i.test(v.lang)) ||
       list.find(v => /zh[-_](HK|Hant)/i.test(v.lang)) ||
       list.find(v => /^(zh|cmn)/i.test(v.lang)) || null;
@@ -136,6 +145,12 @@
     voice = pickVoice();
     if (synth.addEventListener) synth.addEventListener('voiceschanged', () => { voice = pickVoice(); });
   }
+  /* 換語言：重新挑該語言的語音，並打斷正在念的 */
+  if (root.I18N) root.I18N.onChange(() => {
+    voice = pickVoice();
+    try { if (synth) synth.cancel(); } catch (e) { /* 忽略 */ }
+    loadClips();
+  });
 
   function b64ToBuf(b64) {
     const bin = atob(b64);
@@ -145,18 +160,21 @@
   }
 
   function loadClips() {
-    if (clipsLoading || !ctx || !root.VoiceClips) return;
-    clipsLoading = true;
-    for (const k in root.VoiceClips) {
+    const lg = vlang();
+    const set = lg === 'en' ? root.VoiceClipsEn : root.VoiceClips;
+    if (clipsLoading[lg] || !ctx || !set) return;
+    clipsLoading[lg] = true;
+    const buf = clipBuf[lg];
+    for (const k in set) {
       try {
-        const p = ctx.decodeAudioData(b64ToBuf(root.VoiceClips[k]), b => { clipBuf[k] = b; }, () => {});
-        if (p && p.then) p.then(b => { clipBuf[k] = b; }).catch(() => {});
+        const p = ctx.decodeAudioData(b64ToBuf(set[k]), b => { buf[k] = b; }, () => {});
+        if (p && p.then) p.then(b => { buf[k] = b; }).catch(() => {});
       } catch (e) { /* 這一段解不開就算了，會改用裝置語音 */ }
     }
   }
 
   function playClip(rank) {
-    const b = clipBuf[rank];
+    const b = clipBuf[vlang()][rank];
     if (!ctx || !b) return false;
     const src = ctx.createBufferSource();
     src.buffer = b;
@@ -175,8 +193,8 @@
       /* Chrome 閒置一陣子語音會卡住，先 resume；還在念上一個數字就直接打斷 */
       if (synth.speaking || synth.pending) synth.cancel();
       synth.resume();
-      const u = new root.SpeechSynthesisUtterance(SAY[rank - 1]);
-      u.lang = voice ? voice.lang : 'zh-TW';
+      const u = new root.SpeechSynthesisUtterance(sayText(rank));
+      u.lang = voice ? voice.lang : (vlang() === 'en' ? 'en-US' : 'zh-TW');
       if (voice) u.voice = voice;
       u.rate = 1.3;
       u.pitch = 1.25;
@@ -201,8 +219,8 @@
     voice = voice || pickVoice();
     try {
       synth.resume();
-      const u = new root.SpeechSynthesisUtterance(SAY[0]);
-      u.lang = voice ? voice.lang : 'zh-TW';
+      const u = new root.SpeechSynthesisUtterance(sayText(1));
+      u.lang = voice ? voice.lang : (vlang() === 'en' ? 'en-US' : 'zh-TW');
       if (voice) u.voice = voice;
       u.rate = 2;
       u.volume = 0;
@@ -225,7 +243,7 @@
     else if (!playClip(rank)) speakDevice(rank);
   }
 
-  /** 設定裡的「試聽」：念 一、二、三 */
+  /** 設定裡的「試聽」：念 1、2、3（一、二、三／one、two、three） */
   function previewVoice() {
     unlock();
     const was = settings.voice;
@@ -246,7 +264,7 @@
     get settings() { return settings; },
     get hasDeviceVoice() { return !!voice; },
     get voiceSource() { return voiceSource(); },
-    get clipsReady() { return Object.keys(clipBuf).length; },
+    get clipsReady() { return Object.keys(clipBuf[vlang()]).length; },
     get clipPlays() { return playClip.count || 0; }
   };
 })(typeof self !== 'undefined' ? self : this);

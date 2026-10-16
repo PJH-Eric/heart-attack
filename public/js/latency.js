@@ -200,10 +200,14 @@
     const quality = ms === null ? 'unknown' : ms <= 30 ? 'good' : ms < 100 ? 'warn' : 'bad';
     el.classList.add('is-' + quality);
     el.querySelector('.latency-meter__value').textContent = ms === null ? '--' : String(ms);
-    el.setAttribute('aria-label', ms === null ? '連線延遲，等待回應' : '連線延遲 ' + ms + ' 毫秒');
-    el.title = ms === null ? '連線延遲：等待回應' : '連線延遲：' + ms + ' ms';
+    const tt = (k, p, fb) => (window.I18N ? window.I18N.t(k, p) : fb);
+    el.setAttribute('aria-label', ms === null ? tt('latency.waiting', null, '連線延遲，等待回應') : tt('latency.ms', { ms: ms }, '連線延遲 ' + ms + ' 毫秒'));
+    el.title = ms === null ? tt('latency.waitingTitle', null, '連線延遲：等待回應') : tt('latency.msTitle', { ms: ms }, '連線延遲：' + ms + ' ms');
     dock();
   }
+
+  /* 換語言：徽章的提示文字跟著換 */
+  if (window.I18N) window.I18N.onChange(() => { if (meter && active) render(); });
 
   function report(ms) {
     value = Number.isFinite(ms) && ms >= 0 ? ms : null;

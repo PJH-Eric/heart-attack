@@ -11,7 +11,13 @@
   const { $, $$, esc } = root.UI;
   const Art = root.Art;
   const SEAT_COLORS = ['#FF6F61', '#3FA9F5', '#6DBE45', '#A57CF0'];
-  const DIFF_NAME = { kid: '幼幼班', easy: '簡單', normal: '普通', hard: '困難' };
+  const T = (k, p) => root.I18N.t(k, p);
+  const diffName = k => (k ? T('diff.' + k) : '');
+  const you = () => T('you.paren');
+  /** 中文「你 翻出」→「你翻出」（英文不動） */
+  const fixYou = text => (root.I18N.lang === 'zh-Hant' ? String(text).replace(/^你 /, '你') : String(text));
+  /** 座位顯示名：電腦的名字翻譯，真人暱稱原樣 */
+  const seatName = s => root.UI.pname(s.name, !!s.ai);
 
   function positions(n) {
     if (n === 2) return ['top'];
@@ -21,11 +27,11 @@
 
   function rankText(r) { return Art.RANKS[r - 1]; }
   /** 毫秒 → 「0.42 秒」 */
-  function sec(ms) { return ms == null ? '—' : (ms / 1000).toFixed(2) + ' 秒'; }
+  function sec(ms) { return ms == null ? '—' : T('unit.sec', { v: (ms / 1000).toFixed(2) }); }
   function num(ms) { return ms == null ? '—' : (ms / 1000).toFixed(2); }
   /** 喊數一律用數字 1～13（牌面上仍是 A、J、Q、K） */
   function callText(n) { return String(n); }
-  function cardText(c) { return Art.SUIT_ZH[c.s] + rankText(c.r); }
+  function cardText(c) { return T('card.text', { suit: Art.suitName(c.s), rank: rankText(c.r) }); }
 
   /**
    * @param {HTMLElement} board
@@ -39,7 +45,8 @@
     let mySeat = -1;
     let pileCards = [];       /* 本段翻出來、還在牌堆上的牌（只留最後 4 張畫出來） */
     let slappedReveal = 0;    /* 我已經拍過的那張牌 */
-    let log = [];
+    let log = [];             /* 每筆是回傳文字的函式，換語言時才能重新翻譯 */
+    let waitText = '';
     let waitBase = null;      /* { left, at } 自動發牌倒數 */
     let seatInfo = {};        /* 線上：{ [id]: { offline, takeover } } */
     let flyToken = 0;
@@ -61,16 +68,16 @@
         '<div class="opps">' + order.map((si, k) => seatHtml(v, si, 'pos-' + pos[k])).join('') + '</div>' +
         '<div class="center">' +
           '<div class="center-inner">' +
-            '<div class="call" aria-live="off"><span class="call-label">喊</span><b class="call-num">1</b></div>' +
+            '<div class="call" aria-live="off"><span class="call-label">' + T('table.call') + '</span><b class="call-num">1</b></div>' +
             '<div class="pile-wrap">' +
-              '<div class="pile" aria-label="牌堆">' +
+              '<div class="pile" aria-label="' + T('table.pile') + '">' +
                 '<div class="pile-under"></div><div class="pile-cards"></div><div class="slap-marks"></div>' +
               '</div>' +
-              '<div class="pile-info"><span class="stack">' + Art.stackIcon() + '</span>牌堆 <b class="pile-n">0</b> 張</div>' +
+              '<div class="pile-info"><span class="stack">' + Art.stackIcon() + '</span><span class="pile-lbl">' + T('table.pile') + '</span> <b class="pile-n">0</b> <span class="pile-unit">' + T('unit.cards') + '</span></div>' +
             '</div>' +
           '</div>' +
           '<div class="wait-box">' +
-            '<button type="button" class="btn3d coral start-btn" hidden>開始</button>' +
+            '<button type="button" class="btn3d coral start-btn" hidden>' + T('table.start') + '</button>' +
             '<div class="wait-text" aria-live="polite"></div>' +
             '<div class="banner" hidden></div>' +
           '</div>' +
@@ -78,10 +85,10 @@
         '<div class="me-area">' +
           seatHtml(v, base, 'me') +
           (mySeat >= 0
-            ? '<button type="button" class="slap-btn" aria-label="拍牌（空白鍵）" aria-keyshortcuts="Space">' +
-              Art.handIcon() + '<span>拍牌</span></button>' +
+            ? '<button type="button" class="slap-btn" aria-label="' + T('table.slapAria') + '" aria-keyshortcuts="Space">' +
+              Art.handIcon() + '<span class="slap-lbl">' + T('table.slap') + '</span></button>' +
               '<div class="out-badge" hidden></div>'
-            : '<div class="spec-badge">' + Art.icon('eye') + '<span>你是觀戰者</span></div>') +
+            : '<div class="spec-badge">' + Art.icon('eye') + '<span class="spec-lbl">' + T('table.youSpec') + '</span></div>') +
         '</div></div>';
 
       const slapBtn = $('.slap-btn', board);
@@ -100,7 +107,7 @@
       const me = si === mySeat;
       return '<div class="seat ' + cls + '" data-seat="' + si + '" style="--seat:' + SEAT_COLORS[si % 4] + '">' +
         '<div class="avatar">' + Art.animalSvg(s.char || 'otter') + '</div>' +
-        '<div class="seat-body"><div class="seat-tag"><b class="name">' + esc(me ? s.name + '（你）' : s.name) + '</b>' +
+        '<div class="seat-body"><div class="seat-tag"><b class="name">' + esc(me ? seatName(s) + you() : seatName(s)) + '</b>' +
         '<span class="count">' + Art.stackIcon() + '<b>' + s.count + '</b></span></div>' +
         '<span class="seat-flag"></span></div>' +
         '<div class="bubble" hidden></div>' +
@@ -111,7 +118,7 @@
 
     function name(si) {
       if (!view || !view.seats[si]) return '';
-      return si === mySeat ? '你' : view.seats[si].name;
+      return si === mySeat ? T('you.short') : seatName(view.seats[si]);
     }
 
     /* ---------- 拍牌 ---------- */
@@ -175,24 +182,21 @@
         shownAt = { id: e.revealId, t: performance.now() };
         clearMarks();
         if (!quiet) { root.Sound.sfx('flip'); root.Sound.call(e.call); }
-        addLog(name(e.seat) + ' 翻出 ' + cardText(e.card) + '（喊 ' + callText(e.call) + '）');
+        addLog(() => T('log.flip', { who: name(e.seat), card: cardText(e.card), call: callText(e.call) }));
         pulse('.call-num');
       } else if (e.type === 'slap') {
         mark(e.seat, e.order, e.wrong);
         root.Sound.sfx('slap');
         if (e.wrong) root.Sound.sfx('wrong');
-        bubble(e.seat, e.wrong ? '拍錯了！' : '拍！' + e.order + (e.rt != null ? '・' + (e.rt / 1000).toFixed(2) + '秒' : ''), e.wrong ? 'bad' : '');
+        bubble(e.seat, () => e.wrong ? T('bubble.wrong') : e.rt != null ? T('bubble.slapRt', { order: e.order, sec: (e.rt / 1000).toFixed(2) }) : T('bubble.slap', { order: e.order }), e.wrong ? 'bad' : '');
         if (e.seat === mySeat && !e.wrong) root.UI.vibrate(20);
       } else if (e.type === 'collect') {
-        const who = name(e.seat);
-        const txt = e.reason === 'wrong' ? who + ' 拍錯了，收走 ' + e.count + ' 張'
-          : e.reason === 'miss' ? who + ' 沒拍到，收走 ' + e.count + ' 張'
-          : who + ' 最後拍，收走 ' + e.count + ' 張';
+        const txt = () => T(e.reason === 'wrong' ? 'log.collectWrong' : e.reason === 'miss' ? 'log.collectMiss' : 'log.collectLast', { who: name(e.seat), n: e.count });
         banner(txt, e.seat === mySeat ? 'bad' : '');
         addLog(txt);
         flyToSeat(e.seat, motion);
         root.Sound.sfx('collect');
-        bubble(e.seat, '收牌', 'bad');
+        bubble(e.seat, () => T('bubble.collect'), 'bad');
         if (e.seat === mySeat) root.UI.vibrate([60, 40, 60]);
         const el = seatEl(e.seat);
         if (el && motion) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
@@ -201,15 +205,15 @@
         clearMarks();
         root.Sound.sfx('start');
         root.Sound.warmVoice();
-        addLog((e.auto ? '時間到，系統幫 ' + name(e.seat) + ' ' : name(e.seat) + ' ') + (e.segment === 1 ? '按下開始' : '按下自動發牌') + '，從 1 喊起');
+        addLog(() => T(e.auto ? 'log.startAuto' : 'log.start', { who: name(e.seat), action: T(e.segment === 1 ? 'table.start' : 'table.autoDeal') }));
       } else if (e.type === 'out') {
-        const txt = name(e.seat) + ' 出完了！第 ' + e.place + ' 名';
+        const txt = () => T('log.out', { who: name(e.seat), place: e.place });
         banner(txt, '');
         addLog(txt);
-        bubble(e.seat, '第 ' + e.place + ' 名', 'good');
+        bubble(e.seat, () => T('bubble.place', { place: e.place }), 'good');
         root.Sound.sfx('win');
       } else if (e.type === 'win') {
-        addLog(name(e.seat) + ' 把牌出完了！');
+        addLog(() => T('log.win', { who: name(e.seat) }));
       }
     }
 
@@ -221,7 +225,9 @@
         const s = v.seats[i];
         $('.count b', el).textContent = s.count;
         const info = seatInfo[s.id] || {};
-        const flag = s.out ? '第 ' + s.out + ' 名・出完了' : info.offline ? '離線' : info.takeover ? '電腦代打' : s.ai ? '電腦・' + (DIFF_NAME[s.ai] || '') : '';
+        const flag = s.out ? T('flag.out', { place: s.out }) : info.offline ? T('flag.offline') : info.takeover ? T('flag.takeover') : s.ai ? T('flag.ai', { diff: diffName(s.ai) }) : '';
+        const nameEl = $('.name', el);
+        if (nameEl) nameEl.textContent = i === mySeat ? seatName(s) + you() : seatName(s);
         const f = $('.seat-flag', el);
         f.textContent = flag;
         f.hidden = !flag;
@@ -246,7 +252,7 @@
         num.textContent = '1';
         call.classList.add('idle');
       }
-      $('.call-label', board).textContent = v.phase === 'waitStart' || !v.reveal ? '準備喊' : '喊';
+      $('.call-label', board).textContent = v.phase === 'waitStart' || !v.reveal ? T('table.callReady') : T('table.call');
 
       $('.pile-n', board).textContent = v.pileCount;
       drawUnder(v.pileCount);
@@ -255,20 +261,21 @@
       const startBtn = $('.start-btn', board);
       const iStart = v.phase === 'waitStart' && v.starter === mySeat && mySeat >= 0;
       startBtn.hidden = !iStart;
-      startBtn.textContent = v.segment === 0 ? '開始' : '自動發牌';
+      startBtn.textContent = v.segment === 0 ? T('table.start') : T('table.autoDeal');
       const wait = $('.wait-text', board);
       if (v.phase === 'waitStart' && !iStart) {
-        wait.textContent = '等 ' + name(v.starter) + ' 按' + (v.segment === 0 ? '開始' : '自動發牌') + '…';
+        waitText = T('wait.for', { who: name(v.starter), action: v.segment === 0 ? T('table.start') : T('table.autoDeal') });
       } else if (iStart) {
-        wait.textContent = v.segment === 0 ? '你是第一順位，按開始！' : '你收了牌，換你按自動發牌';
-      } else wait.textContent = '';
+        waitText = v.segment === 0 ? T('wait.firstYou') : T('wait.collectedYou');
+      } else waitText = '';
+      wait.textContent = waitText;
       const meOut = mySeat >= 0 && v.seats[mySeat].out;
       $('.center', board).classList.toggle('waiting', v.phase === 'waitStart');
       $('.wait-box', board).classList.toggle('idle', v.phase !== 'waitStart');
       const outBadge = $('.out-badge', board);
       if (outBadge) {
         outBadge.hidden = !meOut;
-        if (meOut) outBadge.innerHTML = '<b>第 ' + meOut + ' 名</b><span>' + (v.phase === 'over' ? '出完了！' : '出完了，等其他人打完') + '</span>';
+        if (meOut) outBadge.innerHTML = '<b>' + T('out.place', { place: meOut }) + '</b><span>' + (v.phase === 'over' ? T('out.done') : T('out.waitOthers')) + '</span>';
       }
       tickCountdown();
 
@@ -300,8 +307,7 @@
       if (!wait) return;
       const sec = Math.ceil(left / 1000);
       if (sec <= 5) {
-        const base = wait.textContent.replace(/（\d+ 秒後自動發牌）$/, '');
-        wait.textContent = base + '（' + sec + ' 秒後自動發牌）';
+        wait.textContent = waitText + T('wait.countdown', { n: sec });
       }
     }
 
@@ -368,18 +374,20 @@
     }
     function clearMarks() { const b = $('.slap-marks', board); if (b) b.innerHTML = ''; $$('.bubble', board).forEach(x => { x.hidden = true; }); }
 
-    function bubble(si, text, kind) {
+    function bubble(si, fn, kind) {
       const el = seatEl(si);
       if (!el) return;
       const b = $('.bubble', el);
-      b.textContent = text;
+      b._fn = fn;
+      b.textContent = fn();
       b.className = 'bubble ' + (kind || '');
       b.hidden = false;
     }
 
-    function banner(text, kind) {
+    function banner(fn, kind) {
       const b = $('.banner', board);
-      b.textContent = text.replace(/^你 /, '你');
+      b._fn = fn;
+      b.textContent = fixYou(fn());
       b.className = 'banner ' + (kind || '');
       b.hidden = false;
     }
@@ -391,8 +399,8 @@
       el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
     }
 
-    function addLog(text) {
-      log.push(text.replace(/^你 /, '你'));
+    function addLog(fn) {
+      log.push(fn);
       if (log.length > 30) log.shift();
     }
 
@@ -401,11 +409,13 @@
     function renderSummary(v) {
       if (!summary) return;
       let status;
-      if (v.phase === 'over') status = name(v.winner) + ' 獲勝！';
-      else if (mySeat >= 0 && v.seats[mySeat].out) status = '你出完了（第 ' + v.seats[mySeat].out + ' 名），觀看其他人打完';
-      else if (v.phase === 'waitStart') status = v.starter === mySeat ? '換你按' + (v.segment === 0 ? '開始' : '自動發牌') : '等 ' + name(v.starter) + ' 啟動';
-      else if (v.phase === 'result') status = '收牌中…';
-      else status = '翻牌中，數字一樣就拍！';
+      const act = v.segment === 0 ? T('table.start') : T('table.autoDeal');
+      if (v.phase === 'over') status = T('sum.wins', { who: name(v.winner) });
+      else if (mySeat >= 0 && v.seats[mySeat].out) status = T('sum.youOut', { place: v.seats[mySeat].out });
+      else if (v.phase === 'waitStart') status = v.starter === mySeat ? T('sum.yourTurnPress', { action: act }) : T('sum.waitStarter', { who: name(v.starter) });
+      else if (v.phase === 'result') status = T('sum.collecting');
+      else status = T('sum.dealing');
+      status = fixYou(status);
 
       const n = v.seats.length;
       const nf = nextFlipper(v);
@@ -414,46 +424,63 @@
         const i = k;
         const s = v.seats[i];
         const tags = [];
-        if (v.phase === 'dealing' && nf === i) tags.push('<i class="tag turn">下一張</i>');
-        if (v.phase === 'waitStart' && v.starter === i) tags.push('<i class="tag start">啟動者</i>');
-        if (s.out) tags.push('<i class="tag ready">第 ' + s.out + ' 名</i>');
+        if (v.phase === 'dealing' && nf === i) tags.push('<i class="tag turn">' + T('tag.next') + '</i>');
+        if (v.phase === 'waitStart' && v.starter === i) tags.push('<i class="tag start">' + T('tag.starter') + '</i>');
+        if (s.out) tags.push('<i class="tag ready">' + T('out.place', { place: s.out }) + '</i>');
         rows.push('<li class="' + (i === mySeat ? 'me' : '') + '" style="--seat:' + SEAT_COLORS[i % 4] + '">' +
           '<span class="mini">' + Art.animalSvg(s.char || 'otter') + '</span>' +
-          '<span class="nm">' + esc(i === mySeat ? s.name + '（你）' : s.name) + '</span>' + tags.join('') +
+          '<span class="nm">' + esc(i === mySeat ? seatName(s) + you() : seatName(s)) + '</span>' + tags.join('') +
           '<b class="ct">' + s.count + '</b></li>');
       }
-      const role = opt.online ? (mySeat >= 0 ? '' : '<p class="role">你是觀戰者，只能看、可以聊天</p>') : '';
+      const role = opt.online ? (mySeat >= 0 ? '' : '<p class="role">' + T('sum.specRole') + '</p>') : '';
       summary.innerHTML =
         '<div class="sum-status">' + esc(status) + '</div>' + role +
         '<div class="sum-grid">' +
-          '<div><small>下一張喊</small><b>' + (v.phase === 'dealing' ? callText(v.nextCall) : '1') + '</b></div>' +
-          '<div><small>牌堆</small><b>' + v.pileCount + '<i>張</i></b></div>' +
-          '<div><small>已翻</small><b>' + v.flips + '<i>張</i></b></div>' +
+          '<div><small>' + T('sum.nextCall') + '</small><b>' + (v.phase === 'dealing' ? callText(v.nextCall) : '1') + '</b></div>' +
+          '<div><small>' + T('table.pile') + '</small><b>' + v.pileCount + '<i>' + T('unit.cards') + '</i></b></div>' +
+          '<div><small>' + T('sum.flipped') + '</small><b>' + v.flips + '<i>' + T('unit.cards') + '</i></b></div>' +
         '</div>' +
         mySpeed(v) +
-        '<h4>翻牌順序</h4><ol class="sum-seats">' + rows.join('') + '</ol>' +
-        '<h4>最近發生</h4><ol class="sum-log">' +
-          (log.length ? log.slice(-6).reverse().map(t => '<li>' + esc(t) + '</li>').join('') : '<li class="dim">還沒開始</li>') +
+        '<h4>' + T('sum.order') + '</h4><ol class="sum-seats">' + rows.join('') + '</ol>' +
+        '<h4>' + T('sum.recent') + '</h4><ol class="sum-log">' +
+          (log.length ? log.slice(-6).reverse().map(f => '<li>' + esc(fixYou(f())) + '</li>').join('') : '<li class="dim">' + T('sum.notStarted') + '</li>') +
         '</ol>' +
-        '<p class="sum-mode">結束方式：' + (v.endMode === 'last' ? '打到只剩一人有牌' : '有人出完就結束') + '</p>' +
-        '<p class="sum-keys">空白鍵＝拍牌　Enter＝開始／自動發牌</p>';
+        '<p class="sum-mode">' + T('sum.endMode', { mode: T(v.endMode === 'last' ? 'end.last' : 'end.first') }) + '</p>' +
+        '<p class="sum-keys">' + T('sum.keys') + '</p>';
     }
 
     /** 左欄：你這局的拍速 */
     function mySpeed(v) {
       if (mySeat < 0 || !v.stats || !v.stats[mySeat]) return '';
       const st = v.stats[mySeat];
-      return '<h4>你這局的拍速</h4><div class="sum-grid speed">' +
-        '<div><small>平均</small><b>' + (st.avg == null ? '—' : (st.avg / 1000).toFixed(2)) + '<i>秒</i></b></div>' +
-        '<div><small>最快</small><b>' + (st.best == null ? '—' : (st.best / 1000).toFixed(2)) + '<i>秒</i></b></div>' +
-        '<div><small>拍對／錯</small><b>' + st.hits + '<i>／' + st.wrong + '</i></b></div>' +
+      return '<h4>' + T('sum.mySpeed') + '</h4><div class="sum-grid speed">' +
+        '<div><small>' + T('sum.avg') + '</small><b>' + (st.avg == null ? '—' : (st.avg / 1000).toFixed(2)) + '<i>' + T('unit.secShort') + '</i></b></div>' +
+        '<div><small>' + T('sum.best') + '</small><b>' + (st.best == null ? '—' : (st.best / 1000).toFixed(2)) + '<i>' + T('unit.secShort') + '</i></b></div>' +
+        '<div><small>' + T('sum.hitsWrong') + '</small><b>' + st.hits + '<i>／' + st.wrong + '</i></b></div>' +
         '</div>';
     }
 
     function destroy() { board.innerHTML = ''; if (summary) summary.innerHTML = ''; view = null; lastSeq = -1; }
 
+    /** 換語言：只重畫文字，不動對局狀態 */
+    function relabel() {
+      if (!view) return;
+      const set = (sel, text) => { const el = $(sel, board); if (el) el.textContent = text; };
+      $('.pile', board).setAttribute('aria-label', T('table.pile'));
+      set('.pile-lbl', T('table.pile'));
+      set('.pile-unit', T('unit.cards'));
+      set('.slap-lbl', T('table.slap'));
+      set('.spec-lbl', T('table.youSpec'));
+      const sb = $('.slap-btn', board);
+      if (sb) sb.setAttribute('aria-label', T('table.slapAria'));
+      $$('.bubble', board).forEach(b => { if (b._fn && !b.hidden) b.textContent = b._fn(); });
+      const bn = $('.banner', board);
+      if (bn && bn._fn && !bn.hidden) bn.textContent = fixYou(bn._fn());
+      updateStatic(view);
+    }
+
     return {
-      render, trySlap, destroy, tickCountdown,
+      render, trySlap, destroy, tickCountdown, relabel,
       get mySeat() { return mySeat; },
       get view() { return view; },
       redrawCards() { drawPile(false); }
@@ -468,12 +495,13 @@
     const order = v.ranking || v.seats.map((s, i) => i).sort((a, b) => v.seats[a].count - v.seats[b].count);
     const last = v.endMode === 'last';
     let title;
-    if (me < 0) title = winner.name + ' 獲勝！';
-    else if (me === v.winner) title = '你贏了！';
-    else if (last && me === v.loser) title = '你是最後有牌的人';
-    else if (last) title = '你是第 ' + (order.indexOf(me) + 1) + ' 名';
-    else title = winner.name + ' 先出完了';
-    const sub = last && v.loser != null ? '<p class="result-sub">' + esc(v.seats[v.loser].name) + (v.loser === me ? '（你）' : '') + ' 最後還有 ' + v.seats[v.loser].count + ' 張牌</p>' : '';
+    const wn = root.UI.pname(winner.name, !!winner.ai);
+    if (me < 0) title = T('result.winnerWins', { who: wn });
+    else if (me === v.winner) title = T('result.youWin');
+    else if (last && me === v.loser) title = T('result.youLast');
+    else if (last) title = T('result.youPlace', { place: order.indexOf(me) + 1 });
+    else title = T('result.finishedFirst', { who: wn });
+    const sub = last && v.loser != null ? '<p class="result-sub">' + esc(T('result.lastHas', { who: root.UI.pname(v.seats[v.loser].name, !!v.seats[v.loser].ai) + (v.loser === me ? T('you.paren') : ''), n: v.seats[v.loser].count })) + '</p>' : '';
     return '<div class="result-card">' +
       '<div class="result-hero">' + Art.animalSvg(winner.char || 'otter', { cls: 'bounce' }) + '</div>' +
       '<h2 id="result-title">' + esc(title) + '</h2>' + sub +
@@ -481,8 +509,8 @@
         const s = v.seats[i];
         return '<li class="' + (i === me ? 'me' : '') + '"><span class="no">' + (k + 1) + '</span>' +
           '<span class="mini">' + Art.animalSvg(s.char || 'otter') + '</span>' +
-          '<span class="nm">' + esc(s.name) + (i === me ? '（你）' : '') + '</span>' +
-          '<b>' + (s.count === 0 ? '出完了' : '剩 ' + s.count + ' 張') + '</b></li>';
+          '<span class="nm">' + esc(root.UI.pname(s.name, !!s.ai) + (i === me ? T('you.paren') : '')) + '</span>' +
+          '<b>' + (s.count === 0 ? T('result.done') : T('result.left', { n: s.count })) + '</b></li>';
       }).join('') + '</ol>' +
       speedHtml(v, me, extra) +
       (stats ? '<p class="result-stats">' + esc(stats) + '</p>' : '') +
@@ -494,14 +522,14 @@
     if (!v.stats) return '';
     const rows = v.seats.map((s, i) => ({ s, i, st: v.stats[i] }))
       .sort((a, b) => (a.st.avg == null) - (b.st.avg == null) || (a.st.avg || 0) - (b.st.avg || 0));
-    const badge = extra.newBest ? '<span class="rec">新紀錄！最快一拍</span>' : extra.newAvg ? '<span class="rec">新紀錄！平均最快</span>' : '';
-    return '<div class="speed-box"><h3>拍速' + badge + '</h3>' +
-      '<table class="speed-table compact"><thead><tr><th scope="col">玩家</th><th scope="col">平均（秒）</th><th scope="col">最快（秒）</th><th scope="col">對</th><th scope="col">錯</th></tr></thead><tbody>' +
+    const badge = extra.newBest ? '<span class="rec">' + T('result.newBest') + '</span>' : extra.newAvg ? '<span class="rec">' + T('result.newAvg') + '</span>' : '';
+    return '<div class="speed-box"><h3>' + T('result.speed') + badge + '</h3>' +
+      '<table class="speed-table compact"><thead><tr><th scope="col">' + T('result.player') + '</th><th scope="col">' + T('result.avgSec') + '</th><th scope="col">' + T('result.bestSec') + '</th><th scope="col">' + T('result.right') + '</th><th scope="col">' + T('result.wrong') + '</th></tr></thead><tbody>' +
       rows.map(r => '<tr class="' + (r.i === me ? 'me' : '') + '"><th scope="row"><span class="mini">' + Art.animalSvg(r.s.char || 'otter') + '</span>' +
-        esc(r.s.name) + (r.i === me ? '（你）' : '') + '</th>' +
+        esc(root.UI.pname(r.s.name, !!r.s.ai) + (r.i === me ? T('you.paren') : '')) + '</th>' +
         '<td>' + num(r.st.avg) + '</td><td>' + num(r.st.best) + '</td><td>' + r.st.hits + '</td><td>' + r.st.wrong + '</td></tr>').join('') +
       '</tbody></table></div>';
   }
 
-  root.Table = { create, resultHtml, sec, SEAT_COLORS, DIFF_NAME };
+  root.Table = { create, resultHtml, sec, SEAT_COLORS, diffName };
 })(typeof self !== 'undefined' ? self : this);

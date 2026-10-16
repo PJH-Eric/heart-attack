@@ -8,12 +8,8 @@
   let settingsModal = null, menuModal = null;
   let chatPopOpen = false, unread = 0;
 
-  const DIFF_HINT = {
-    kid: '電腦拍得很慢、翻牌也放慢，適合 3～5 歲小朋友',
-    easy: '電腦反應慢一點，偶爾會看錯',
-    normal: '跟一般休閒玩家差不多',
-    hard: '電腦手很快，幾乎不出錯'
-  };
+  const T = (k, p) => root.I18N.t(k, p);
+  let menuAuto = false;
 
   function boot() {
     /* 圖示 */
@@ -30,8 +26,12 @@
     $('#solo-ai [data-step="-1"]').innerHTML = Art.icon('minus');
     $('#solo-ai [data-step="1"]').innerHTML = Art.icon('plus');
 
+    /* 語言切換鈕：放在設定鈕旁（設定鈕是全畫面共用的一顆，所以只需要一顆切換鈕） */
+    root.I18N.mountToggle({ after: $('#btn-settings'), id: 'btn-lang' });
+
     root.Sound.apply(store);
     applyVisual();
+    syncLobbyLink();
 
     /* 第一次點擊才能出聲（瀏覽器規定） */
     const unlock = () => { root.Sound.unlock(); document.removeEventListener('pointerdown', unlock, true); document.removeEventListener('keydown', unlock, true); };
@@ -85,8 +85,7 @@
       root.Store.save(store);
       renderSoloSetup();
     });
-    $('#solo-diff').innerHTML = root.Rules.DIFFICULTY_LIST.map(k =>
-      '<button type="button" role="radio" data-diff="' + k + '">' + root.Rules.DIFFICULTIES[k].name + '</button>').join('');
+    renderDiffButtons();
     $('#solo-diff').addEventListener('click', e => {
       const b = e.target.closest('[data-diff]');
       if (!b) return;
@@ -132,9 +131,39 @@
     });
     window.addEventListener('resize', () => gameLayout());
 
+    /* 切換語言：只重畫文字，不重置對局 */
+    root.I18N.onChange(relabelAll);
+
     renderStats();
     if (root.Online.hasInvite) root.Online.enterLobby();
     else show('home');
+  }
+
+  function renderDiffButtons() {
+    $('#solo-diff').innerHTML = root.Rules.DIFFICULTY_LIST.map(k =>
+      '<button type="button" role="radio" data-diff="' + k + '">' + T('diff.' + k) + '</button>').join('');
+  }
+
+  /** 「回遊戲大廳」連結帶上目前語言（?lang=），跨來源也能同步 */
+  function syncLobbyLink() {
+    const a = $('#lobby-home-link');
+    if (!a) return;
+    if (!a.dataset.base) a.dataset.base = a.getAttribute('href');
+    a.setAttribute('href', root.I18N.withLang(a.dataset.base));
+  }
+
+  function relabelAll() {
+    syncLobbyLink();
+    $('#hero').innerHTML = Art.heroSvg();
+    renderDiffButtons();
+    renderSoloSetup();
+    renderStats();
+    if (root.UI.current === 'help') renderHelp();
+    if (root.UI.current === 'speed') renderSpeed();
+    if (menuModal && menuModal.isOpen) buildMenu();
+    if (root.Online) root.Online.relabel();
+    if (root.Solo.active) root.Solo.relabel();
+    renderUnread();
   }
 
   function applyVisual() {
@@ -168,7 +197,7 @@
   function renderStats() {
     let play = 0, win = 0;
     for (const k in store.stats) { play += store.stats[k].play; win += store.stats[k].win; }
-    $('#home-stats').textContent = play ? '這台裝置上玩過 ' + play + ' 局，贏了 ' + win + ' 局' : '';
+    $('#home-stats').textContent = play ? T('home.stats', { play, win }) : '';
   }
 
   /* ---------- 單機 ---------- */
@@ -191,22 +220,19 @@
   function renderSoloSetup() {
     const diffs = aiDiffs().slice(0, store.aiCount);
     const same = diffs.every(x => x === diffs[0]);
-    const names = root.Rules.DIFFICULTIES;
     $('#solo-ai-list').innerHTML = diffs.map((d, i) =>
-      '<li><span class="ai-no">電腦 ' + (i + 1) + '</span><div class="seg small" role="radiogroup" aria-label="電腦 ' + (i + 1) + ' 的難度">' +
-      DIFF_ORDER.map(k => '<button type="button" role="radio" data-ai="' + i + '" data-diff="' + k + '" aria-checked="' + (k === d) + '">' + names[k].name + '</button>').join('') +
+      '<li><span class="ai-no">' + T('solo.aiN', { n: i + 1 }) + '</span><div class="seg small" role="radiogroup" aria-label="' + T('solo.aiNDiff', { n: i + 1 }) + '">' +
+      DIFF_ORDER.map(k => '<button type="button" role="radio" data-ai="' + i + '" data-diff="' + k + '" aria-checked="' + (k === d) + '">' + T('diff.' + k) + '</button>').join('') +
       '</div></li>').join('');
     $('#solo-ai-n').textContent = store.aiCount;
     $('#solo-ai [data-step="-1"]').disabled = store.aiCount <= 1;
     $('#solo-ai [data-step="1"]').disabled = store.aiCount >= 3;
     $$('#solo-diff [data-diff]').forEach(b => b.setAttribute('aria-checked', String(same && b.dataset.diff === diffs[0])));
     $$('#solo-end [data-end]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.end === store.endMode)));
-    $('#solo-end-hint').textContent = store.endMode === 'last'
-      ? '出完的人依序拿名次、離開牌桌，其他人繼續打，直到只剩一個人手上有牌'
-      : '只要有一個人把牌出完，這局就結束';
+    $('#solo-end-hint').textContent = store.endMode === 'last' ? T('solo.endHintLast') : T('solo.endHintFirst');
     const easiest = DIFF_ORDER.find(k => diffs.includes(k));
-    $('#solo-diff-hint').textContent = (same ? DIFF_HINT[diffs[0]] : '混合難度：翻牌節奏跟著最簡單的電腦（' + names[easiest].name + '）') +
-      '（共 ' + (store.aiCount + 1) + ' 人，每人約 ' + Math.floor(52 / (store.aiCount + 1)) + ' 張）';
+    $('#solo-diff-hint').textContent = (same ? T('diffHint.' + diffs[0]) : T('solo.mixedHint', { diff: T('diff.' + easiest) })) +
+      T('solo.dealHint', { n: store.aiCount + 1, cards: Math.floor(52 / (store.aiCount + 1)) });
   }
 
   function startSolo() {
@@ -220,7 +246,7 @@
     if (!store.seenHelp) {
       store.seenHelp = true;
       root.Store.save(store);
-      toast('數字跟喊的一樣就按「拍牌」或空白鍵！');
+      toast(T('toast.firstTip'));
     }
   }
 
@@ -269,25 +295,32 @@
 
   function openMenu(auto, from) {
     if (!from) from = isWide() ? $('#btn-menu') : $('#btn-menu-fab');
+    menuAuto = !!auto;
+    buildMenu();
+    menuModal.open(from);
+  }
+
+  function buildMenu() {
+    const auto = menuAuto;
     const body = $('#menu-body');
     if (root.Solo.active) {
-      $('#menu-title').textContent = auto ? '遊戲暫停了' : '暫停';
-      body.innerHTML = (auto ? '<p class="hint">剛剛離開畫面，先幫你暫停</p>' : '') +
-        '<button type="button" class="btn3d coral btn-wide" id="m-resume">繼續</button>' +
-        '<button type="button" class="btn3d sand btn-wide" id="m-restart">重新開始</button>' +
-        '<button type="button" class="btn3d sea btn-wide" id="m-home">回首頁</button>';
+      $('#menu-title').textContent = auto ? T('menu.paused') : T('menu.pause');
+      body.innerHTML = (auto ? '<p class="hint">' + T('menu.autoPaused') + '</p>' : '') +
+        '<button type="button" class="btn3d coral btn-wide" id="m-resume">' + T('menu.resume') + '</button>' +
+        '<button type="button" class="btn3d sand btn-wide" id="m-restart">' + T('menu.restart') + '</button>' +
+        '<button type="button" class="btn3d sea btn-wide" id="m-home">' + T('nav.home') + '</button>';
       $('#m-resume').onclick = () => menuModal.close();
       $('#m-restart').onclick = () => { menuModal.close(); $('#result').hidden = true; root.Solo.restart(); };
       $('#m-home').onclick = () => { root.Solo.stop(); menuModal.close(); show('home'); renderStats(); };
     } else {
       const room = root.Online.room;
       const isPlayer = room && room.you.role === 'player';
-      $('#menu-title').textContent = '選單';
-      body.innerHTML = '<p class="hint">線上對局不會暫停，其他人會繼續玩。</p>' +
-        '<button type="button" class="btn3d coral btn-wide" id="m-resume">回到牌桌</button>' +
-        (room && room.invite.active ? '<button type="button" class="btn3d sea btn-wide" id="m-copy">複製邀請連結</button>' : '') +
-        '<button type="button" class="btn3d sand btn-wide" id="m-leave">離開房間</button>' +
-        (isPlayer ? '<small class="hint">對局中離開，你的牌會交給電腦代打</small>' : '');
+      $('#menu-title').textContent = T('menu.menu');
+      body.innerHTML = '<p class="hint">' + T('menu.onlineHint') + '</p>' +
+        '<button type="button" class="btn3d coral btn-wide" id="m-resume">' + T('menu.backToTable') + '</button>' +
+        (room && room.invite.active ? '<button type="button" class="btn3d sea btn-wide" id="m-copy">' + T('menu.copyInvite') + '</button>' : '') +
+        '<button type="button" class="btn3d sand btn-wide" id="m-leave">' + T('room.leave') + '</button>' +
+        (isPlayer ? '<small class="hint">' + T('menu.leaveWarn') + '</small>' : '');
       $('#m-resume').onclick = () => menuModal.close();
       const cp = $('#m-copy');
       if (cp) cp.onclick = () => {
@@ -299,26 +332,25 @@
       };
       $('#m-leave').onclick = () => { menuModal.close(); root.Online.leaveRoom(); };
     }
-    menuModal.open(from);
   }
 
   /* ---------- 我的拍速 ---------- */
 
-  const KIND_NAME = { kid: '幼幼班', easy: '簡單', normal: '普通', hard: '困難', mixed: '混合難度', online: '線上' };
+  const kindName = k => (k ? T('kind.' + k) : '');
   const sec = root.Table.sec;
   function speedTitle(avg) {
     if (avg == null) return '';
-    if (avg < 350) return '閃電手';
-    if (avg < 450) return '快手';
-    if (avg < 600) return '靈巧';
-    if (avg < 800) return '穩穩的';
-    return '慢慢來';
+    if (avg < 350) return T('speed.t1');
+    if (avg < 450) return T('speed.t2');
+    if (avg < 600) return T('speed.t3');
+    if (avg < 800) return T('speed.t4');
+    return T('speed.t5');
   }
 
   /** 最近幾局的平均反應時間（單一數列長條圖：一個色相、細長條、圓角朝上、滑過顯示數值） */
   function speedChart(list, width) {
     const games = list.filter(g => g.avg != null).slice(-20);
-    if (games.length < 2) return '<p class="hint">玩兩局以上就會出現最近的拍速變化。</p>';
+    if (games.length < 2) return '<p class="hint">' + T('speed.needTwo') + '</p>';
     /* 用實際寬度當 viewBox 寬，手機上座標軸的字才不會被縮到看不見 */
     const W = Math.max(280, Math.min(760, Math.round(width || 560))), H = W < 420 ? 180 : 220, L = 40, B = 26, T = 18, R = 8;
     const max = Math.max(1000, Math.ceil(Math.max(...games.map(g => g.avg)) / 250) * 250);
@@ -337,14 +369,14 @@
       const r = Math.min(4, bw / 2, h);
       const d = 'M' + x + ' ' + (H - B) + 'V' + (top + r) + 'Q' + x + ' ' + top + ' ' + (x + r) + ' ' + top +
         'H' + (x + bw - r) + 'Q' + (x + bw) + ' ' + top + ' ' + (x + bw) + ' ' + (top + r) + 'V' + (H - B) + 'Z';
-      const tip = g.d + '・' + (KIND_NAME[g.kind] || '') + '・平均 ' + sec(g.avg) + '・拍對 ' + g.hits + ' 次';
+      const tip = T('speed.tip', { d: g.d, kind: kindName(g.kind), avg: sec(g.avg), hits: g.hits });
       bars += '<g class="bar" tabindex="0" data-tip="' + esc(tip) + '"><rect x="' + (L + i * step) + '" y="' + T + '" width="' + step + '" height="' + (H - B - T) + '" class="hit"/>' +
         '<path d="' + d + '"/><title>' + esc(tip) + '</title></g>';
       if (g.avg === bestAvg && !bestLabel) bestLabel = '<text x="' + (x + bw / 2) + '" y="' + (top - 5) + '" class="lbl" text-anchor="middle">' + (g.avg / 1000).toFixed(2) + '</text>';
     });
-    return '<div class="chart-wrap"><svg viewBox="0 0 ' + W + ' ' + H + '" class="speed-chart" role="img" aria-label="最近 ' + games.length + ' 局的平均反應時間">' +
+    return '<div class="chart-wrap"><svg viewBox="0 0 ' + W + ' ' + H + '" class="speed-chart" role="img" aria-label="' + T('speed.chartAria', { n: games.length }) + '">' +
       grid + '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + (H - B) + '" y2="' + (H - B) + '" class="base"/>' + bars + bestLabel +
-      '<text x="' + L + '" y="' + (H - 6) + '" class="ax">較早</text><text x="' + (W - R) + '" y="' + (H - 6) + '" class="ax" text-anchor="end">最近</text>' +
+      '<text x="' + L + '" y="' + (H - 6) + '" class="ax">' + T('speed.earlier') + '</text><text x="' + (W - R) + '" y="' + (H - 6) + '" class="ax" text-anchor="end">' + T('speed.latest') + '</text>' +
       '</svg><div class="chart-tip" hidden></div></div>';
   }
 
@@ -358,8 +390,8 @@
     const r = store.reaction || {};
     const body = $('#speed-body');
     if (!r.games) {
-      body.innerHTML = '<div class="panel-card speed-empty"><p>還沒有拍速紀錄。</p><p class="hint">每一局都會記下你從「牌翻出來」到「按下拍牌」花了多久。</p>' +
-        '<button type="button" class="btn3d coral btn-wide" id="speed-play">去玩一局</button></div>';
+      body.innerHTML = '<div class="panel-card speed-empty"><p>' + T('speed.empty') + '</p><p class="hint">' + T('speed.emptyHint') + '</p>' +
+        '<button type="button" class="btn3d coral btn-wide" id="speed-play">' + T('speed.playOne') + '</button></div>';
       $('#speed-play').onclick = () => openSolo();
       return;
     }
@@ -369,20 +401,20 @@
     const kinds = ['kid', 'easy', 'normal', 'hard', 'mixed', 'online'].filter(k => r.byKind[k] && (r.byKind[k].hits || r.byKind[k].best != null));
     body.innerHTML =
       '<div class="speed-hero panel-card">' +
-        '<div class="big"><small>最快一拍</small><b>' + (r.best == null ? '—' : (r.best / 1000).toFixed(2)) + '<i>秒</i></b></div>' +
-        '<div><small>平均反應</small><b>' + (avg == null ? '—' : (avg / 1000).toFixed(2)) + '<i>秒</i></b>' + (avg != null ? '<span class="title-chip">' + speedTitle(avg) + '</span>' : '') + '</div>' +
-        '<div><small>拍得準</small><b>' + (acc == null ? '—' : acc) + '<i>%</i></b><span class="sub">拍對 ' + r.hits + '・拍錯 ' + r.wrong + '・沒拍到 ' + r.missed + '</span></div>' +
-        '<div><small>玩過</small><b>' + r.games + '<i>局</i></b></div>' +
+        '<div class="big"><small>' + T('speed.best') + '</small><b>' + (r.best == null ? '—' : (r.best / 1000).toFixed(2)) + '<i>' + T('unit.secShort') + '</i></b></div>' +
+        '<div><small>' + T('speed.avgReact') + '</small><b>' + (avg == null ? '—' : (avg / 1000).toFixed(2)) + '<i>' + T('unit.secShort') + '</i></b>' + (avg != null ? '<span class="title-chip">' + speedTitle(avg) + '</span>' : '') + '</div>' +
+        '<div><small>' + T('speed.accuracy') + '</small><b>' + (acc == null ? '—' : acc) + '<i>%</i></b><span class="sub">' + T('speed.counts', { hits: r.hits, wrong: r.wrong, missed: r.missed }) + '</span></div>' +
+        '<div><small>' + T('speed.played') + '</small><b>' + r.games + '<i>' + T('unit.games') + '</i></b></div>' +
       '</div>' +
-      '<div class="panel-card"><h3 class="card-title">最近的平均反應時間（秒，越短越快）</h3>' + speedChart(r.history, chartWidth()) + '</div>' +
-      (kinds.length ? '<div class="panel-card"><h3 class="card-title">各難度</h3><table class="speed-table wide"><thead><tr><th scope="col">模式</th><th scope="col">最快一拍</th><th scope="col">平均</th><th scope="col">單局最佳平均</th><th scope="col">拍對</th></tr></thead><tbody>' +
-        kinds.map(k => { const x = r.byKind[k]; return '<tr><th scope="row">' + KIND_NAME[k] + '</th><td>' + sec(x.best) + '</td><td>' + sec(x.hits ? Math.round(x.sum / x.hits) : null) + '</td><td>' + sec(x.bestAvg) + '</td><td>' + x.hits + '</td></tr>'; }).join('') +
+      '<div class="panel-card"><h3 class="card-title">' + T('speed.recentTitle') + '</h3>' + speedChart(r.history, chartWidth()) + '</div>' +
+      (kinds.length ? '<div class="panel-card"><h3 class="card-title">' + T('speed.byLevel') + '</h3><table class="speed-table wide"><thead><tr><th scope="col">' + T('speed.mode') + '</th><th scope="col">' + T('speed.best') + '</th><th scope="col">' + T('speed.avg') + '</th><th scope="col">' + T('speed.bestAvg') + '</th><th scope="col">' + T('speed.hits') + '</th></tr></thead><tbody>' +
+        kinds.map(k => { const x = r.byKind[k]; return '<tr><th scope="row">' + kindName(k) + '</th><td>' + sec(x.best) + '</td><td>' + sec(x.hits ? Math.round(x.sum / x.hits) : null) + '</td><td>' + sec(x.bestAvg) + '</td><td>' + x.hits + '</td></tr>'; }).join('') +
         '</tbody></table></div>' : '') +
-      '<div class="panel-card"><h3 class="card-title">最近 ' + Math.min(10, r.history.length) + ' 局</h3><table class="speed-table wide"><thead><tr><th scope="col">日期</th><th scope="col">模式</th><th scope="col">平均</th><th scope="col">最快</th><th scope="col">對／錯／沒拍到</th></tr></thead><tbody>' +
-        r.history.slice(-10).reverse().map(g => '<tr><th scope="row">' + g.d.slice(5).replace('-', '/') + '</th><td>' + (KIND_NAME[g.kind] || '') + '</td><td>' + sec(g.avg) + '</td><td>' + sec(g.best) + '</td><td>' + g.hits + '／' + g.wrong + '／' + g.missed + '</td></tr>').join('') +
+      '<div class="panel-card"><h3 class="card-title">' + T('speed.lastN', { n: Math.min(10, r.history.length) }) + '</h3><table class="speed-table wide"><thead><tr><th scope="col">' + T('speed.date') + '</th><th scope="col">' + T('speed.mode') + '</th><th scope="col">' + T('speed.avg') + '</th><th scope="col">' + T('speed.fastest') + '</th><th scope="col">' + T('speed.rwm') + '</th></tr></thead><tbody>' +
+        r.history.slice(-10).reverse().map(g => '<tr><th scope="row">' + g.d.slice(5).replace('-', '/') + '</th><td>' + kindName(g.kind) + '</td><td>' + sec(g.avg) + '</td><td>' + sec(g.best) + '</td><td>' + g.hits + '／' + g.wrong + '／' + g.missed + '</td></tr>').join('') +
         '</tbody></table>' +
-        '<p class="hint">反應時間是在你這台裝置上量的：從牌出現在畫面上，到你按下拍牌。線上也一樣，不含網路延遲。</p>' +
-        '<div class="speed-reset"><button type="button" class="link-btn danger" id="speed-clear">清除拍速紀錄</button></div></div>';
+        '<p class="hint">' + T('speed.note') + '</p>' +
+        '<div class="speed-reset"><button type="button" class="link-btn danger" id="speed-clear">' + T('speed.clear') + '</button></div></div>';
 
     /* 長條滑過／點一下顯示數值（觸控也能看） */
     const wrap = body.querySelector('.chart-wrap');
@@ -407,12 +439,12 @@
       if (b.dataset.confirm) {
         root.Store.clearReaction(store);
         renderSpeed();
-        toast('拍速紀錄已清除');
+        toast(T('toast.speedCleared'));
         return;
       }
       b.dataset.confirm = '1';
-      b.textContent = '確定要清除嗎？再按一次';
-      setTimeout(() => { if (document.contains(b)) { delete b.dataset.confirm; b.textContent = '清除拍速紀錄'; } }, 4000);
+      b.textContent = T('speed.clearConfirm');
+      setTimeout(() => { if (document.contains(b)) { delete b.dataset.confirm; b.textContent = T('speed.clear'); } }, 4000);
     };
   }
 
@@ -422,27 +454,27 @@
     const card = (s, r) => '<span class="help-card">' + Art.cardSvg({ s, r }) + '</span>';
     $('#help-body').innerHTML =
       '<ol class="help-steps">' +
-      '<li><div class="help-pic">' + Art.cardBackSvg() + '</div><div><h3>1. 發牌</h3>' +
-        '<p>一副 52 張撲克牌（沒有鬼牌），系統排好座位順序後，一人一張輪流發完。大家都看不到自己的牌，只知道剩幾張。</p></div></li>' +
-      '<li><div class="help-pic call-demo"><span>喊</span><b>1</b></div><div><h3>2. 按開始</h3>' +
-        '<p>第一順位的人按「開始」，系統就照順序自動幫每個人翻牌，同時喊 1、2、3……13，喊到 13 再回到 1。牌面的 A 算 1、J 算 11、Q 算 12、K 算 13。</p></div></li>' +
-      '<li><div class="help-pic pair"><div class="call-demo small"><span>喊</span><b>11</b></div>' + card('H', 11) + '</div><div><h3>3. 數字一樣就拍！</h3>' +
-        '<p>翻出來的點數跟喊的數字一樣（花色不重要），所有人趕快按「拍牌」（鍵盤按空白鍵，也可以直接點牌堆）。</p></div></li>' +
-      '<li><div class="help-pic">' + Art.handIcon() + '</div><div><h3>4. 最慢的人收牌</h3>' +
-        '<p>最後拍的人（或沒拍到的人）要把中間整疊牌收回去，放到自己的牌底下。</p></div></li>' +
-      '<li><div class="help-pic pair"><div class="call-demo small"><span>喊</span><b>5</b></div>' + card('S', 6) + '</div><div><h3>5. 拍錯也要收</h3>' +
-        '<p>數字不一樣卻拍下去，第一個拍錯的人收走整疊牌。還沒翻牌時按拍牌不算，也不會被罰。</p></div></li>' +
-      '<li><div class="help-pic">' + Art.animalSvg('bunny') + '</div><div><h3>6. 收牌的人接著發</h3>' +
-        '<p>收了牌的人按「自動發牌」，從自己開始、再從 1 重新喊起。誰先把手上的牌出完，誰就贏！</p></div></li>' +
+      '<li><div class="help-pic">' + Art.cardBackSvg() + '</div><div><h3>' + T('help.s1t') + '</h3>' +
+        '<p>' + T('help.s1') + '</p></div></li>' +
+      '<li><div class="help-pic call-demo"><span>' + T('table.call') + '</span><b>1</b></div><div><h3>' + T('help.s2t') + '</h3>' +
+        '<p>' + T('help.s2') + '</p></div></li>' +
+      '<li><div class="help-pic pair"><div class="call-demo small"><span>' + T('table.call') + '</span><b>11</b></div>' + card('H', 11) + '</div><div><h3>' + T('help.s3t') + '</h3>' +
+        '<p>' + T('help.s3') + '</p></div></li>' +
+      '<li><div class="help-pic">' + Art.handIcon() + '</div><div><h3>' + T('help.s4t') + '</h3>' +
+        '<p>' + T('help.s4') + '</p></div></li>' +
+      '<li><div class="help-pic pair"><div class="call-demo small"><span>' + T('table.call') + '</span><b>5</b></div>' + card('S', 6) + '</div><div><h3>' + T('help.s5t') + '</h3>' +
+        '<p>' + T('help.s5') + '</p></div></li>' +
+      '<li><div class="help-pic">' + Art.animalSvg('bunny') + '</div><div><h3>' + T('help.s6t') + '</h3>' +
+        '<p>' + T('help.s6') + '</p></div></li>' +
       '</ol>' +
-      '<div class="help-tips"><h3>小提醒</h3><ul>' +
-        '<li>電腦有四種難度：幼幼班、簡單、普通、困難。幼幼班的翻牌也會放慢。</li>' +
-        '<li>每一拍都會記下反應時間：拍牌泡泡會顯示秒數，結算有「拍速」排行，首頁「我的拍速」看得到你的紀錄。</li>' +
-        '<li>結束方式有兩種：「有人出完就結束」，或「打到只剩一人有牌」—— 出完的人依序拿名次離開牌桌，最後還有牌的人就是最後一名。線上由房主決定。</li>' +
-        '<li>右上角齒輪可以開關音樂、音效、喊數語音，也能把喊數字放大。</li>' +
-        '<li>線上房間以伺服器收到的先後判定誰先拍；網路比較慢的人可能比較吃虧。</li>' +
+      '<div class="help-tips"><h3>' + T('help.tips') + '</h3><ul>' +
+        '<li>' + T('help.tip1') + '</li>' +
+        '<li>' + T('help.tip2') + '</li>' +
+        '<li>' + T('help.tip3') + '</li>' +
+        '<li>' + T('help.tip4') + '</li>' +
+        '<li>' + T('help.tip5') + '</li>' +
       '</ul></div>' +
-      '<button type="button" class="btn3d coral btn-wide" id="help-go">我懂了，開始玩！</button>';
+      '<button type="button" class="btn3d coral btn-wide" id="help-go">' + T('help.go') + '</button>';
     $('#help-go').onclick = () => openSolo();
   }
 
