@@ -215,6 +215,7 @@
     root.UI.chat.canSend = true;
 
     if (room.game) {
+      if (root.GameAnalytics && room.you.role === 'player') root.GameAnalytics.start({ mode: 'online', players: room.game.seats.length }, room.id + '|' + room.game.gameId);
       /* 新的一局開始：還停在上一局結算畫面的人也要自動回到牌桌 */
       $('#result').hidden = true;
       if (root.UI.current !== 'game') { show('game'); root.App.gameLayout(true); }
@@ -405,6 +406,7 @@
     const mine = v.seats.findIndex(s => s.id === myId);
     let rec = null;
     if (mine >= 0) {
+      if (root.GameAnalytics) root.GameAnalytics.end({ result: mine === v.winner ? 'win' : 'lose' });
       root.Store.record(root.App.store, 'online', mine === v.winner);
       if (v.stats) rec = root.Store.recordReaction(root.App.store, 'online', v.stats[mine]);
       root.Sound.sfx(mine === v.winner ? 'win' : 'lose');

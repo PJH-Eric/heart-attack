@@ -20,6 +20,7 @@
     while (diffs.length < cfg.aiCount) diffs.push(diffs[diffs.length - 1]);
     cfg.aiDiffs = diffs;
     cfg.kind = diffs.every(d => d === diffs[0]) ? diffs[0] : 'mixed';
+    if (root.GameAnalytics) root.GameAnalytics.start({ mode: 'ai', difficulty: cfg.kind, players: cfg.aiCount + 1 });
     const players = [{ id: 'me', name: cfg.name, char: cfg.char }];
     for (let i = 0; i < cfg.aiCount; i++) {
       players.push({ id: 'ai' + i, name: others[i].name, char: others[i].id, ai: diffs[i] });
@@ -94,6 +95,7 @@
   function showResult(v) {
     if (!game) return;
     const win = v.winner === game.table.mySeat;
+    if (root.GameAnalytics) root.GameAnalytics.end({ result: win ? 'win' : 'lose' });
     root.Store.record(root.App.store, game.cfg.kind, win);
     root.Sound.sfx(win ? 'win' : 'lose');
     const st = root.App.store.stats[game.cfg.kind] || { play: 0, win: 0 };

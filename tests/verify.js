@@ -1,6 +1,8 @@
 /* ===== tests/verify.js — 規則核心與電腦的單元測試（node tests/verify.js） ===== */
 'use strict';
 
+require('./seo.js');
+
 const Rules = require('../public/js/rules.js');
 const AI = require('../public/js/ai.js');
 const RNG = require('../public/js/rng.js');
