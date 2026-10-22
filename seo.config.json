@@ -6,5 +6,8 @@
   "lobbyUrl": "https://pjh-eric.github.io/game-lobby/",
   "googleSiteVerification": "",
   "genre": "卡牌",
-  "players": "1-4"
+  "players": "1-4",
+  "iconUrl": "https://pjh-eric.github.io/heart-attack/favicon-96.png",
+  "ogImage": "https://pjh-eric.github.io/heart-attack/og-image.png",
+  "ogImageAlt": "海島心臟病遊戲圖示"
 }
