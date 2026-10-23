@@ -15,7 +15,7 @@
   const diffName = k => (k ? T('diff.' + k) : '');
   const you = () => T('you.paren');
   /** 中文「你 翻出」→「你翻出」（英文不動） */
-  const fixYou = text => (root.I18N.lang === 'zh-Hant' ? String(text).replace(/^你 /, '你') : String(text));
+  const fixYou = text => (root.I18N.lang !== 'en' ? String(text).replace(/^你 /, '你') : String(text));
   /** 座位顯示名：電腦的名字翻譯，真人暱稱原樣 */
   const seatName = s => root.UI.pname(s.name, !!s.ai);
 

@@ -98,9 +98,12 @@
   const NOUN = ['水獺', '兔兔', '水豚', '企鵝', '柴柴', '海龜', '無尾熊', '貓咪', '海豹', '螃蟹', '椰子', '小魚'];
   const ADJ_EN = ['Happy', 'Speedy', 'Tiny', 'Round', 'Giggly', 'Brave', 'Fluffy', 'Clever', 'Sunny', 'Chill', 'Shiny', 'Curious'];
   const NOUN_EN = ['Otter', 'Bunny', 'Capy', 'Penguin', 'Shiba', 'Turtle', 'Koala', 'Kitty', 'Seal', 'Crab', 'Coconut', 'Fishy'];
+  const ADJ_HANS = ['开心', '快手', '小小', '圆滚滚', '爱笑', '勇敢', '软绵绵', '机灵', '阳光', '悠哉', '闪亮', '好奇'];
+  const NOUN_HANS = ['水獭', '兔兔', '水豚', '企鹅', '柴柴', '海龟', '无尾熊', '猫咪', '海豹', '螃蟹', '椰子', '小鱼'];
   function randomName() {
     const en = root.I18N.lang === 'en';
-    const a = en ? ADJ_EN : ADJ, n = en ? NOUN_EN : NOUN;
+    const hans = root.I18N.lang === 'zh-Hans';
+    const a = en ? ADJ_EN : hans ? ADJ_HANS : ADJ, n = en ? NOUN_EN : hans ? NOUN_HANS : NOUN;
     return a[Math.floor(Math.random() * a.length)] + (en ? ' ' : '') + n[Math.floor(Math.random() * n.length)];
   }
 
