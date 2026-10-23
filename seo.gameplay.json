@@ -1,0 +1,35 @@
+{
+  "zh-Hant": {
+    "name": "海島心臟病",
+    "summary": "輪流翻牌並喊數，牌點和喊數相同時趕快拍下牌堆，考驗你的眼力與手速。",
+    "modes": [
+      "單機練習",
+      "四段 AI",
+      "線上房間",
+      "觀戰"
+    ],
+    "controls": "牌點和當前喊數相同時，拍紅色拍牌鈕、牌堆或按空白鍵。"
+  },
+  "zh-Hans": {
+    "name": "海岛心脏病",
+    "summary": "轮流翻牌并喊数，牌点和喊数相同时赶快拍下牌堆，考验你的眼力与手速。",
+    "modes": [
+      "单机练习",
+      "四段 AI",
+      "线上房间",
+      "观战"
+    ],
+    "controls": "牌点和当前喊数相同时，拍红色拍牌钮、牌堆或按空白键。"
+  },
+  "en": {
+    "name": "Heart Attack Island",
+    "summary": "Flip cards and call out numbers in turn. When the card matches the call, slap the pile fast. Test your eyes and your hands.",
+    "modes": [
+      "Solo Practice",
+      "Four AI Levels",
+      "Online Room",
+      "Spectate"
+    ],
+    "controls": "When the card matches the current call, hit the red slap button, the pile, or the space bar."
+  }
+}
