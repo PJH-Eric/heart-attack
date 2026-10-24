@@ -70,3 +70,11 @@ RWD 版面的做法：牌桌用 container query 量「牌桌實際拿到的空�
 所有美術（撲克牌、動物、圖示）都是程式內手繪 SVG；音樂與音效用 Web Audio 即時合成；喊數語音有兩種來源：
 內建錄音（`public/js/voice-clips.js`，用開源 espeak-ng 離線合成 一、二……十三共 13 段，跟翻牌同時念出）
 和裝置的中文語音。設定裡的「喊數聲音」可選自動／遊戲內建／裝置語音，並可試聽。沒有外部素材與授權問題。要換成正式美術或音檔，只需替換 `public/js/art.js`、`public/js/audio.js`；換真人喊數錄音就把 `voice-clips.js` 裡 13 段 mp3（base64）換掉。
+
+## 維護與驗證產物
+
+介面支援繁體中文、簡體中文與英文；從右上角語言選單切換，新增說明文字時須同步維護三種語系。遊戲人數、操作與勝負條件以本文件的玩法說明及規則核心為準。
+
+以 `package.json` 的 scripts 為可執行指令來源；`npm test` 執行基本驗證，`npm run verify` 執行該專案列出的整合驗證。需要 Playwright、瀏覽器或網路的檢查，依各測試章節的前置條件執行。
+
+截圖、測試報告、記錄檔及快取為可重新產生的驗證產物，不屬於正式遊戲資產，也不提交版本控制。測試完成後可清除 `screenshots/`、`shots/`、`.shots/`、`test-results/`、`playwright-report/`、`coverage/`、`.cache/`、`tmp/`、`temp/` 與 `*.log`。保留正式圖片、圖示、音訊、字型、原始碼、測試案例、鎖定檔及 `.env.example`；`node_modules/` 是相依套件目錄，不能當成圖片或暫存檔一起刪除。

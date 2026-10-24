@@ -6,3 +6,21 @@ npm-debug.log*
 Thumbs.db
 *.tgz
 screenshots/rwd/
+
+# 可重新產生的測試截圖、暫存與快取
+/screenshots/
+/shots/
+/.shots/
+/test-results/
+/playwright-report/
+/coverage/
+/.cache/
+/.pytest_cache/
+**/__pycache__/
+*.pyc
+*.log
+*.tmp
+*.bak
+*.tsbuildinfo
+/tmp/
+/temp/
