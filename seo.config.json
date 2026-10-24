@@ -8,6 +8,6 @@
   "genre": "卡牌",
   "players": "1-4",
   "iconUrl": "https://pjh-eric.github.io/heart-attack/favicon-96.png",
-  "ogImage": "https://pjh-eric.github.io/heart-attack/og-image.png",
-  "ogImageAlt": "海島心臟病遊戲圖示"
+  "ogImage": "https://pjh-eric.github.io/heart-attack/assets/images/cover.webp",
+  "ogImageAlt": "海島心臟病 遊戲封面"
 }
