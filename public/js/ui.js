@@ -17,6 +17,7 @@
   let current = 'home';
   const listeners = [];
   function show(name) {
+    if (root.ServerOutage) root.ServerOutage.setScreen(name);
     $$('.screen').forEach(s => { s.hidden = s.dataset.screen !== name; });
     current = name;
     document.body.dataset.screen = name;
