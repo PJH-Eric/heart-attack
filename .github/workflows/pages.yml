@@ -33,7 +33,7 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 22        # online-check 用到內建 WebSocket，Node 22 才有
+          node-version: "26.12.1"        # online-check 使用內建 WebSocket
 
       - name: 跑測試
         run: npm run verify
