@@ -94,7 +94,7 @@ function createServer(opt) {
     if (lobbyDirty) {
       lobbyDirty = false;
       const list = hub.listRooms();
-      for (const pid of lobby) send(pid, { type: 'lobby', rooms: list });
+      for (const pid of lobby) send(pid, { type: 'lobby', rooms: list, online: sockets.size });
     }
   }
 
@@ -118,7 +118,8 @@ function createServer(opt) {
       sockets.set(p.id, sock);
       if (!p.roomId) lobby.add(p.id); else lobby.delete(p.id);
       send(p.id, { type: 'welcome', personId: p.id, key: p.key, name: p.name, char: p.char, roomId: p.roomId });
-      send(p.id, { type: 'lobby', rooms: hub.listRooms() });
+      send(p.id, { type: 'lobby', rooms: hub.listRooms(), online: sockets.size });
+      lobbyDirty = true;
       pushRoomTo(p);
       return;
     }
@@ -140,7 +141,7 @@ function createServer(opt) {
         send(p.id, { type: 'welcome', personId: p.id, key: p.key, name: p.name, char: p.char, roomId: p.roomId });
         break;
       case 'lobby':
-        send(p.id, { type: 'lobby', rooms: hub.listRooms() });
+        send(p.id, { type: 'lobby', rooms: hub.listRooms(), online: sockets.size });
         break;
       case 'create': {
         const r = hub.createRoom(p, msg);
@@ -221,6 +222,7 @@ function createServer(opt) {
         sockets.delete(p.id);
         lobby.delete(p.id);
         hub.markOffline(p.id);
+        lobbyDirty = true;
         flush();
       });
     }

@@ -15,6 +15,7 @@
   const S = {
     me: null,               /* { personId, name, char } */
     rooms: [],
+    onlineCount: null,
     room: null,
     invite: null,           /* 網址帶進來的邀請 token */
     inviteInfo: null,
@@ -35,7 +36,7 @@
       S.me = { personId: m.personId, name: m.name, char: m.char };
       if (S.invite && !S.inviteInfo) root.Net.send({ type: 'inviteInfo', invite: S.invite });
     });
-    root.Net.on('lobby', m => { S.rooms = m.rooms || []; renderRooms(); });
+    root.Net.on('lobby', m => { S.rooms = m.rooms || []; S.onlineCount = Number.isInteger(m.online) && m.online >= 0 ? m.online : null; paintOnlineCount(); renderRooms(); });
     root.Net.on('room', m => onRoom(m.room));
     root.Net.on('inviteInfo', m => { S.inviteInfo = m; renderRooms(); });
     root.Net.on('error', m => toast(srv(m.text), 'bad'));
@@ -120,8 +121,17 @@
   }
 
   let lastConn = [null, undefined];
+  function paintOnlineCount() {
+    const count = $('#lobby-online-count');
+    if (!count) return;
+    count.hidden = !Number.isInteger(S.onlineCount);
+    count.textContent = Number.isInteger(S.onlineCount) ? T('lobby.onlineCount', { n: S.onlineCount }) : '';
+  }
+
   function renderConn(s, detail) {
     if (s === undefined) { s = lastConn[0]; detail = lastConn[1]; } else if (s !== lastConn[0] || detail !== undefined) lastConn = [s, detail];
+    if (s !== 'open') S.onlineCount = null;
+    paintOnlineCount();
     const el = $('#lobby-conn');
     if (!el) return;
     const map = {

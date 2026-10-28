@@ -228,6 +228,7 @@ button:disabled { cursor: not-allowed; }
   .room-grid .room-chat-card { order: -1; position: sticky; top: 76px; }
 }
 .conn-line { display: flex; align-items: center; gap: 8px; font-weight: 800; margin-bottom: 12px; padding: 10px 12px; border-radius: 12px; background: #F4ECDC; line-height: 1.4; }
+.lobby-online-count { width: fit-content; max-width: 100%; margin: -4px 0 12px; padding: 5px 12px; border: 2px solid var(--sea-dark); border-radius: 999px; background: #DDF8F5; color: var(--sea-dark); font-size: .9rem; font-weight: 800; }
 .conn-line .dot { width: 12px; height: 12px; border-radius: 50%; background: #B8A58A; flex: none; }
 .conn-line.ok .dot { background: var(--ok); }
 .conn-line.wait .dot { background: #F2A93B; animation: blink 1s infinite; }
