@@ -352,11 +352,11 @@
     const games = list.filter(g => g.avg != null).slice(-20);
     if (games.length < 2) return '<p class="hint">' + T('speed.needTwo') + '</p>';
     /* 用實際寬度當 viewBox 寬，手機上座標軸的字才不會被縮到看不見 */
-    const W = Math.max(280, Math.min(760, Math.round(width || 560))), H = W < 420 ? 180 : 220, L = 40, B = 26, T = 18, R = 8;
+    const W = Math.max(280, Math.min(760, Math.round(width || 560))), H = W < 420 ? 180 : 220, L = 40, B = 26, TOP = 18, R = 8;
     const max = Math.max(1000, Math.ceil(Math.max(...games.map(g => g.avg)) / 250) * 250);
     const step = (W - L - R) / games.length;
     const bw = Math.max(6, Math.min(22, step - 4));
-    const y = v => T + (H - T - B) * (1 - v / max);
+    const y = v => TOP + (H - TOP - B) * (1 - v / max);
     const bestAvg = Math.min(...games.map(g => g.avg));
     let grid = '';
     for (let v = 0; v <= max; v += max / 4) {
@@ -370,7 +370,7 @@
       const d = 'M' + x + ' ' + (H - B) + 'V' + (top + r) + 'Q' + x + ' ' + top + ' ' + (x + r) + ' ' + top +
         'H' + (x + bw - r) + 'Q' + (x + bw) + ' ' + top + ' ' + (x + bw) + ' ' + (top + r) + 'V' + (H - B) + 'Z';
       const tip = T('speed.tip', { d: g.d, kind: kindName(g.kind), avg: sec(g.avg), hits: g.hits });
-      bars += '<g class="bar" tabindex="0" data-tip="' + esc(tip) + '"><rect x="' + (L + i * step) + '" y="' + T + '" width="' + step + '" height="' + (H - B - T) + '" class="hit"/>' +
+      bars += '<g class="bar" tabindex="0" data-tip="' + esc(tip) + '"><rect x="' + (L + i * step) + '" y="' + TOP + '" width="' + step + '" height="' + (H - B - TOP) + '" class="hit"/>' +
         '<path d="' + d + '"/><title>' + esc(tip) + '</title></g>';
       if (g.avg === bestAvg && !bestLabel) bestLabel = '<text x="' + (x + bw / 2) + '" y="' + (top - 5) + '" class="lbl" text-anchor="middle">' + (g.avg / 1000).toFixed(2) + '</text>';
     });
