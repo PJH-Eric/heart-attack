@@ -25,6 +25,9 @@ fs.mkdirSync(OUT, { recursive: true });
 const SHOTS = process.argv.includes('--shots');     /* 加 --shots 才存全部截圖（預設只存有問題的） */
 const ONLY = (process.argv.find(a => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean);
 
+/* 預設只跑代表性尺寸與牌桌狀態（加 --full 才跑全部） */
+const FULL = process.argv.includes('--full');
+const QUICK_VIEWPORTS = ['小手機直', '小手機橫', '平板直', '筆電'];   /* 4 個剛好一輪（--jobs 預設 4） */
 const VIEWPORTS = [
   ['小手機直', 360, 640, true], ['手機直', 390, 844, true], ['大手機直', 430, 932, true],
   ['小手機橫', 640, 360, true], ['手機橫', 844, 390, true],
@@ -200,7 +203,7 @@ async function soloGame(page, base, n, stateName) {
 }
 
 (async () => {
-  console.log('\n海島心臟病 RWD 檢查（' + VIEWPORTS.length + ' 種尺寸）');
+  console.log('\n海島心臟病 RWD 檢查（' + (FULL ? '完整：' + VIEWPORTS.length : '精簡：' + QUICK_VIEWPORTS.length) + ' 種尺寸）');
   const app = createServer();
   app.start();
   await new Promise(r => app.server.listen(0, r));
@@ -227,7 +230,7 @@ async function soloGame(page, base, n, stateName) {
     (report[screen] = report[screen] || []).push(vp + '：' + list.join('；'));
   };
 
-  for (const [vpName, w, h, touch] of VIEWPORTS.filter(v => !ONLY.length || ONLY.includes(v[0]))) {
+  const runViewport = async ([vpName, w, h, touch]) => {
     const ctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: touch, isMobile: touch && w < 900 });
     const page = await ctx.newPage();
     const errs = [];
@@ -267,16 +270,19 @@ async function soloGame(page, base, n, stateName) {
     await page.click('#go-speed');
     await check('我的拍速');
 
-    for (const n of [2, 3, 4]) {
+    for (const n of FULL ? [2, 3, 4] : [2, 4]) {
       await soloGame(page, base, n, 'wait');
       await check('牌桌' + n + '人-等待開始', true);
+      if (!FULL && n === 2) continue;                 /* 精簡模式：2 人只看等待開始 */
       await soloGame(page, base, n, 'deal');
       await check('牌桌' + n + '人-翻牌中', true);
     }
     await soloGame(page, base, 4, 'banner');
     await check('牌桌4人-收牌橫幅', true);
-    await soloGame(page, base, 3, 'out');
-    await check('牌桌3人-自己出完', true);
+    if (FULL) {
+      await soloGame(page, base, 3, 'out');
+      await check('牌桌3人-自己出完', true);
+    }
     await page.evaluate(() => App.openMenu(false));
     await check('暫停選單');
     await page.keyboard.press('Escape');
@@ -333,7 +339,19 @@ async function soloGame(page, base, n, stateName) {
     if (errs.length) note(vpName, 'JS 錯誤', errs.slice(0, 3));
     await ctx.close();
     process.stdout.write('  · ' + vpName + ' ' + w + '×' + h + ' 完成\n');
-  }
+  };
+
+  /* 尺寸之間互不影響，用工作池並行跑（--jobs=N，預設 4） */
+  const JOBS = Math.max(1, parseInt((process.argv.find(a => a.startsWith('--jobs=')) || '').slice(7), 10) || 4);
+  const queue = VIEWPORTS.filter(v => ONLY.length ? ONLY.includes(v[0]) : (FULL || QUICK_VIEWPORTS.includes(v[0])));
+  await Promise.all(Array.from({ length: Math.min(JOBS, queue.length) }, async () => {
+    for (let v; (v = queue.shift());) {
+      try { await runViewport(v); } catch (e) { note(v[0], '執行失敗', [e.message.split('\n')[0]]); }
+    }
+  }));
+  /* 並行完成順序不固定，輸出前依尺寸順序排好 */
+  const order = name => VIEWPORTS.findIndex(v => name.startsWith(v[0] + '：'));
+  for (const k in report) report[k].sort((a, b) => order(a) - order(b));
 
   await browser.close();
   bots.forEach(b => b.close());
