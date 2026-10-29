@@ -152,6 +152,15 @@ function audit(opts) {
   }
 }
 
+/* 等有限動畫／轉場播完（最多 800ms）再量，取代固定等待 */
+async function settle(p) {
+  await p.evaluate(() => Promise.race([
+    Promise.all(document.getAnimations().filter(a => a.effect && a.effect.getComputedTiming().iterations !== Infinity).map(a => a.finished.catch(() => {}))),
+    new Promise(r => setTimeout(r, 800))
+  ]));
+  await p.waitForTimeout(60);
+}
+
 async function freezeSolo(page) {
   await page.evaluate(() => { const g = Solo._debug; g.paused = true; });
 }
@@ -174,14 +183,14 @@ async function soloGame(page, base, n, stateName) {
   /* 讓電腦先開始、跑幾張 */
   await page.evaluate(() => { const g = Solo._debug; g.state.starter = g.state.seats.findIndex(s => s.id !== 'me'); Solo.redraw(); });
   await page.waitForFunction(() => Solo._debug.state.flips >= 3 && Solo._debug.state.phase === 'dealing', null, { timeout: 15000 }).catch(() => {});
-  if (stateName === 'deal') { await freezeSolo(page); await page.waitForTimeout(400); return; }
+  if (stateName === 'deal') { await freezeSolo(page); await settle(page); return; }
   if (stateName === 'banner') {
     /* 自己誤拍 → 收牌橫幅 */
     await page.waitForFunction(() => { const s = Solo._debug.state; return s.phase === 'dealing' && s.reveal && s.reveal.card.r !== s.reveal.call; }, null, { timeout: 15000 }).catch(() => {});
     await page.keyboard.press('Space');
     await page.waitForTimeout(250);
     await freezeSolo(page);
-    await page.waitForTimeout(700);
+    await settle(page);
     return;
   }
   if (stateName === 'out') {
@@ -240,7 +249,7 @@ async function soloGame(page, base, n, stateName) {
     };
     const check = async (name, game) => {
       await page.evaluate(() => window.scrollTo(0, 0));
-      await page.waitForTimeout(450);                 /* 等彈出動畫播完再量 */
+      await settle(page);                 /* 等彈出動畫播完再量 */
       const list = await page.evaluate(audit, { game: !!game });
       note(vpName, name, list);
       await shot(name, list);
@@ -296,21 +305,21 @@ async function soloGame(page, base, n, stateName) {
     await check('大廳');
     await page.click('#lobby-create');
     await page.waitForSelector('#screen-room:not([hidden])');
-    await page.click('[data-act="add-ai"]'); await page.waitForTimeout(150);
-    await page.click('[data-act="add-ai"]'); await page.waitForTimeout(150);
+    await page.click('[data-act="add-ai"]'); await settle(page);
+    await page.click('[data-act="add-ai"]'); await settle(page);
     await check('等待室-房主');
     const link = await page.inputValue('#invite-url');
     const guestCtx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: touch });
     const guest = await guestCtx.newPage();
     await guest.goto(link);
     await guest.waitForSelector('.invite-card button[data-as="player"]');
-    await guest.evaluate(() => window.scrollTo(0, 0)); await guest.waitForTimeout(400);
+    await guest.evaluate(() => window.scrollTo(0, 0)); await settle(guest);
     const inviteList = await guest.evaluate(audit, { game: false });
     note(vpName, '大廳-收到邀請', inviteList);
     if (SHOTS || inviteList.length) await guest.screenshot({ path: path.join(OUT, '大廳-收到邀請-' + vpName + '.png') });
     await guest.click('.invite-card button[data-as="player"]');
     await guest.waitForSelector('#screen-room:not([hidden])');
-    await guest.evaluate(() => window.scrollTo(0, 0)); await guest.waitForTimeout(400);
+    await guest.evaluate(() => window.scrollTo(0, 0)); await settle(guest);
     const gl = await guest.evaluate(audit, { game: false });
     note(vpName, '等待室-玩家', gl);
     if (SHOTS || gl.length) await guest.screenshot({ path: path.join(OUT, '等待室-玩家-' + vpName + '.png') });
@@ -318,7 +327,7 @@ async function soloGame(page, base, n, stateName) {
     await page.waitForSelector('[data-act="start"]:not([disabled])');
     await page.click('[data-act="start"]');
     await page.waitForSelector('#screen-game:not([hidden])');
-    await page.waitForTimeout(2500);
+    await page.waitForSelector(".board .pile"); await settle(page);
     await check('線上牌桌-房主', true);
     if (await page.isVisible('#chat-fab')) {
       await page.click('#chat-fab');
@@ -330,8 +339,7 @@ async function soloGame(page, base, n, stateName) {
     await guest.waitForSelector('.invite-card button[data-as="spectator"]');
     await guest.click('.invite-card button[data-as="spectator"]');
     await guest.waitForSelector('#screen-game:not([hidden])');
-    await guest.waitForTimeout(800);
-    await guest.evaluate(() => window.scrollTo(0, 0)); await guest.waitForTimeout(400);
+    await guest.evaluate(() => window.scrollTo(0, 0)); await settle(guest);
     const sl = await guest.evaluate(audit, { game: true });
     note(vpName, '線上牌桌-觀戰', sl);
     if (SHOTS || sl.length) await guest.screenshot({ path: path.join(OUT, '線上牌桌-觀戰-' + vpName + '.png') });
