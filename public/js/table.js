@@ -502,7 +502,7 @@
     else if (last) title = T('result.youPlace', { place: order.indexOf(me) + 1 });
     else title = T('result.finishedFirst', { who: wn });
     const sub = last && v.loser != null ? '<p class="result-sub">' + esc(T('result.lastHas', { who: root.UI.pname(v.seats[v.loser].name, !!v.seats[v.loser].ai) + (v.loser === me ? T('you.paren') : ''), n: v.seats[v.loser].count })) + '</p>' : '';
-    return '<div class="result-card">' +
+    return '<div class="result-card" data-result-share>' +
       '<div class="result-hero">' + Art.animalSvg(winner.char || 'otter', { cls: 'bounce' }) + '</div>' +
       '<h2 id="result-title">' + esc(title) + '</h2>' + sub +
       '<ol class="rank-list">' + order.map((i, k) => {
