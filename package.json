@@ -19,7 +19,9 @@
   "engines": {
     "node": "^26.12.1"
   },
-  "dependencies": {},
   "license": "MIT",
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "playwright": "^1.64.1"
+  }
 }
