@@ -859,3 +859,12 @@ html { background: #E3BC7E; }
 .char-grid, .setup-me .char-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .char-opt { min-width: 0; overflow-wrap: anywhere; }
 @media(max-width: 360px) { .char-grid, .setup-me .char-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* ---------- 大廳聊天室：套用海島心臟病配色 ---------- */
+body .lc-root {
+  --lc-accent: var(--sea-dark); --lc-accent-ink: #fff;
+  --lc-panel-bg: var(--paper); --lc-panel-solid: var(--paper);
+  --lc-ink: var(--ink); --lc-muted: var(--ink-soft); --lc-line: var(--wood-light);
+  --lc-field-bg: #fff; --lc-sys-bg: var(--sand); --lc-name: var(--coral-dark);
+  --lc-z: 75;
+}

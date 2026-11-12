@@ -250,9 +250,14 @@
       sw('vibrate', T('settings.vibrate'), 'feel', T('settings.vibrateDesc')) +
       sw('reduceMotion', T('settings.reduceMotion'), 'see', T('settings.reduceMotionDesc')) +
       sw('bigCall', T('settings.bigCall'), 'see', T('settings.bigCallDesc')) +
+      (root.LobbyChatUI ? '<label class="set-row"><span class="set-ico">' + root.Art.icon('chat') + '</span>' +
+        '<span class="set-text"><b>' + root.LobbyChatUI.text('set') + '</b><small>' + root.LobbyChatUI.text('setSub') + '</small></span>' +
+        '<input type="checkbox" class="switch" id="set-lobbychat"' + (root.LobbyChatUI.isEnabled() ? ' checked' : '') + '></label>' : '') +
       '<div class="set-actions"><button type="button" class="btn3d sand" id="set-reset">' + T('settings.reset') + '</button>' +
       '<button type="button" class="btn3d sea" data-close>' + T('settings.done') + '</button></div>';
 
+    const lcIn = $('#set-lobbychat');
+    if (lcIn) lcIn.onchange = () => root.LobbyChatUI.setEnabled(lcIn.checked);
     body.oninput = e => {
       const k = e.target.dataset.key;
       if (!k) return;
@@ -280,6 +285,7 @@
     };
     $('#voice-test').onclick = () => root.Sound.previewVoice();
     $('#set-reset').onclick = () => {
+      if (root.LobbyChatUI) root.LobbyChatUI.setEnabled(true);
       root.Store.resetSettings(store);
       buildSettings(store, onChange);
       onChange(store);

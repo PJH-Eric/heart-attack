@@ -41,6 +41,8 @@ function createServer(opt) {
   const sockets = new Map();
   /** 在大廳看列表的連線（還沒進房） */
   const lobby = new Set();
+  /* 大廳聊天室（與房間聊天分開；最近 50 則只存在記憶體） */
+  const lobbyChat = require('./lib/lobby-chat.js').createHub({ send: (pid, msg) => send(pid, msg), key: 'type' });
 
   function send(pid, msg) {
     const s = sockets.get(pid);
@@ -124,6 +126,14 @@ function createServer(opt) {
       return;
     }
     if (!p) return;             /* 還沒 hello 就送其他訊息：忽略 */
+    if (msg.type === 'lobbychat') { lobbyChat.handle(p.id, msg); return; }
+    /* 開房／快速加入如果開出新房，就在大廳聊天公告 */
+    const roomsBefore = msg.type === 'create' || msg.type === 'quick' ? new Set(hub.listRooms().map(r => r.id)) : null;
+    const announceNew = () => {
+      if (!roomsBefore || !p.roomId || roomsBefore.has(p.roomId)) return;
+      const info = hub.listRooms().find(r => r.id === p.roomId);
+      lobbyChat.roomOpened({ code: p.roomId, roomName: info && info.name, host: p.name });
+    };
 
     const reply = (r, okMsg) => {
       if (!r.ok) send(p.id, { type: 'error', text: r.error || '做不到', code: r.code, req: msg.type });
@@ -147,6 +157,7 @@ function createServer(opt) {
         const r = hub.createRoom(p, msg);
         reply(r);
         afterRoomChange();
+        announceNew();
         break;
       }
       case 'join': {
@@ -164,6 +175,7 @@ function createServer(opt) {
         if (!r || !r.ok) r = hub.createRoom(p, {});
         reply(r);
         afterRoomChange();
+        announceNew();
         break;
       }
       case 'inviteInfo':
@@ -221,6 +233,7 @@ function createServer(opt) {
         if (!p || sock.data.replaced || sockets.get(p.id) !== sock) return;
         sockets.delete(p.id);
         lobby.delete(p.id);
+        lobbyChat.drop(p.id);
         hub.markOffline(p.id);
         lobbyDirty = true;
         flush();

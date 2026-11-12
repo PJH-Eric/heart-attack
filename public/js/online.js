@@ -28,6 +28,32 @@
     active: false
   };
 
+  /* ---------- 大廳聊天室（左下氣泡）：跟房間聊天分開 ---------- */
+  function initLobbyChat() {
+    if (!root.LobbyChat || root.LobbyChatUI) return;
+    const chat = root.LobbyChatUI = root.LobbyChat.create({
+      game: 'heart-attack',
+      watch: '#screen-lobby',
+      getName: () => ($('#lobby-name').value.trim() || root.App.store.nickname || ''),
+      setName: n => { $('#lobby-name').value = n.slice(0, 10); saveProfile(); },
+      join: name => root.Net.send({ type: 'lobbychat', op: 'join', name }),
+      leave: () => root.Net.send({ type: 'lobbychat', op: 'leave' }),
+      send: (text, name) => root.Net.send({ type: 'lobbychat', op: 'send', text, name }),
+      joinRoom: code => { saveProfile(); root.Net.send({ type: 'join', roomId: code, as: 'player' }); }
+    });
+    chat.setConnected(!!root.Net.connected);
+    root.Net.onStatus(s => { if (s !== 'open') chat.setConnected(false); });
+    root.Net.on('welcome', () => chat.setConnected(true));
+    root.Net.on('lobbychat', m => {
+      if (m.op === 'history') chat.history(m.history, m.online);
+      else if (m.op === 'msg') chat.add(m.msg);
+      else if (m.op === 'online') chat.online(m.online);
+      else if (m.op === 'error') chat.error(m.code);
+    });
+  }
+
+  initLobbyChat();   /* 先建好，設定彈窗第一次產生時就有「大廳聊天室」開關 */
+
   function init() {
     try { S.invite = new URLSearchParams(location.search).get('invite'); } catch (e) { S.invite = null; }
 
